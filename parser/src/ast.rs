@@ -2,7 +2,6 @@
 pub enum Expr {
   Literal(i64),
   Variable(String),
-  Assign(String, Box<Expr>),
   BinaryOp(Box<Expr>, String, Box<Expr>),
 }
 

@@ -45,6 +45,12 @@ fn parse_identifier(input: &[Token]) -> IResult<&[Token], String> {
 }
 
 fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
+  println!("1");
+  let (input, lhs) = parse_primary(input)?;
+  parse_binary_op(input, lhs)
+}
+
+fn parse_primary(input: &[Token]) -> IResult<&[Token], Expr> {
   if let Some((token, remaining)) = input.split_first() {
     match token {
       Token::Number(n) => Ok((remaining, Expr::Literal(*n))),
@@ -54,6 +60,26 @@ fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
   } else {
     Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
   }
+}
+
+fn parse_binary_op(input: &[Token], lhs: Expr) -> IResult<&[Token], Expr> {
+  let (input, op) = match alt((
+    tag(&Token::Plus),
+    tag(&Token::Minus),
+  ))(input) {
+    Ok((input, op)) => (input, op),
+    Err(_) => return Ok((input, lhs))
+  };
+
+  let (input, rhs) = parse_primary(input)?;
+
+  let expr = match op {
+    Token::Plus => Expr::BinaryOp(Box::new(lhs), "+".to_string(), Box::new(rhs)),
+    Token::Minus => Expr::BinaryOp(Box::new(lhs), "-".to_string(), Box::new(rhs)),
+    _ => unreachable!()
+  };
+
+  Ok((input, expr))
 }
 
 #[cfg(test)]

@@ -41,12 +41,45 @@ pub enum Token {
 
   #[token("-")]
   Minus,
+
+  #[token("*")]
+  Star,
+
+  #[token("/")]
+  Slash,
 }
 
 pub fn lex(input: &str) -> Result<Vec<Token>, String> {
   Token::lexer(input)
     .map(|res| res.map_err(|_| "Error while lexing".to_string()))
     .collect()
+}
+
+pub fn operator_precedence(op: &Token) -> Option<u8> {
+  match op {
+    Token::Plus | Token::Minus => Some(1),
+    Token::Star | Token::Slash => Some(2),
+    Token::Equals => Some(3),
+    _ => None,
+  }
+}
+
+pub fn is_left_associative(op: &Token) -> bool {
+  match op {
+    Token::Plus | Token::Minus | Token::Equals => true,
+    _ => false,
+  }
+}
+
+pub fn operator_to_string(op: &Token) -> String {
+  match op {
+    Token::Plus => "+".to_string(),
+    Token::Minus => "-".to_string(),
+    Token::Star => "*".to_string(),
+    Token::Slash => "/".to_string(),
+    Token::Equals => "==".to_string(),
+    _ => "".to_string(),
+  }
 }
 
 fn parse_number(lex: &Lexer<Token>) -> Result<i64, ()> {

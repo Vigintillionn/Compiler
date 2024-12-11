@@ -1,5 +1,5 @@
 mod ast;
-use lexer::Token;
+use lexer::{operator_precedence, operator_to_string, Token};
 use ast::{Stmt, Expr};
 use nom::{branch::alt, IResult, combinator::map};
 
@@ -45,41 +45,45 @@ fn parse_identifier(input: &[Token]) -> IResult<&[Token], String> {
 }
 
 fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
-  println!("1");
-  let (input, lhs) = parse_primary(input)?;
-  parse_binary_op(input, lhs)
-}
+  let mut input = input;
+  let mut output = Vec::new();
+  let mut op_stack: Vec<&Token> = Vec::new();
 
-fn parse_primary(input: &[Token]) -> IResult<&[Token], Expr> {
-  if let Some((token, remaining)) = input.split_first() {
+  // TODO: Add support for unary operators, parentheses, and function calls
+  while let Some((token, input_next)) = input.split_first() {
     match token {
-      Token::Number(n) => Ok((remaining, Expr::Literal(*n))),
-      Token::Identifier(name) => Ok((remaining, Expr::Variable(name.clone()))),
-      _ => Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+      Token::Plus | Token::Minus | Token::Star | Token::Slash => {
+        while let Some(top_op) = op_stack.last() {
+          if operator_precedence(top_op) >= operator_precedence(token) {
+            let rhs = output.pop().expect("Expected right-hand side of binary operation");
+            let lhs = output.pop().expect("Expected left-hand side of binary operation");
+            output.push(Expr::BinaryOp(Box::new(lhs), operator_to_string(top_op), Box::new(rhs)));
+            op_stack.pop();
+          } else {
+            break;
+          }
+        }
+        op_stack.push(token);
+      }
+      Token::Number(n) => output.push(Expr::Literal(*n)),
+      Token::Identifier(name) => output.push(Expr::Variable(name.clone())),
+      Token::Semicolon => break,
+      _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
     }
+    input = input_next;
+  }
+
+  while let Some(op) = op_stack.pop() {
+    let rhs = output.pop().expect("Expected right-hand side of binary operation");
+    let lhs = output.pop().expect("Expected left-hand side of binary operation");
+    output.push(Expr::BinaryOp(Box::new(lhs), operator_to_string(&op), Box::new(rhs)));
+  }
+
+  if output.len() == 1  {
+    Ok((input, output.pop().expect("Expected expression")))
   } else {
     Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
   }
-}
-
-fn parse_binary_op(input: &[Token], lhs: Expr) -> IResult<&[Token], Expr> {
-  let (input, op) = match alt((
-    tag(&Token::Plus),
-    tag(&Token::Minus),
-  ))(input) {
-    Ok((input, op)) => (input, op),
-    Err(_) => return Ok((input, lhs))
-  };
-
-  let (input, rhs) = parse_primary(input)?;
-
-  let expr = match op {
-    Token::Plus => Expr::BinaryOp(Box::new(lhs), "+".to_string(), Box::new(rhs)),
-    Token::Minus => Expr::BinaryOp(Box::new(lhs), "-".to_string(), Box::new(rhs)),
-    _ => unreachable!()
-  };
-
-  Ok((input, expr))
 }
 
 #[cfg(test)]

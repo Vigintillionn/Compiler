@@ -1,0 +1,7 @@
+[workspace]
+members = [
+  "compiler",
+  "lexer",
+  "parser",
+  "cli"
+]

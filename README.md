@@ -17,7 +17,7 @@ Below is the grammer for the language written in **BNF (Backus-Naur Form)**.
 \\
 &\langle assignment \rangle && \Coloneqq && \langle identifier \rangle \quad "=" \quad \langle expression \rangle \\
 \\
-&\langle block \rangle && \Coloneqq && "{" \quad \langle statement \rangle * \quad "}" \\
+&\langle block \rangle && \Coloneqq && "\{" \quad \langle statement \rangle * \quad "\}" \\
 \\
 &\langle expression \rangle && \Coloneqq && \langle literal \rangle \\
 &&&&& | \langle identifier \rangle \\

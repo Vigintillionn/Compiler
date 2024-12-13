@@ -20,11 +20,11 @@ Below is the grammer for the language written in **BNF (Backus-Naur Form)**.
 &\langle block \rangle && \Coloneqq && "{" \quad \langle statement \rangle * \quad "}" \\
 \\
 &\langle expression \rangle && \Coloneqq && \langle literal \rangle \\
-&&&&& \langle identifier \rangle \\
-&&&&& \langle expression \rangle \quad "+" \quad \langle expression \rangle \\
-&&&&& \langle expression \rangle \quad "-" \quad \langle expression \rangle \\
-&&&&& \langle expression \rangle \quad "*" \quad \langle expression \rangle \\
-&&&&& \langle expression \rangle \quad "/" \quad \langle expression \rangle \\
+&&&&& | \langle identifier \rangle \\
+&&&&& | \langle expression \rangle \quad "+" \quad \langle expression \rangle \\
+&&&&& | \langle expression \rangle \quad "-" \quad \langle expression \rangle \\
+&&&&& | \langle expression \rangle \quad "*" \quad \langle expression \rangle \\
+&&&&& | \langle expression \rangle \quad "/" \quad \langle expression \rangle \\
 \\
 &\langle parameter-list \rangle && \Coloneqq && \langle parameter \rangle \quad ("," \quad \langle parameter \rangle)*\\
 \\

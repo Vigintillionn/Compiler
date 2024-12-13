@@ -18,6 +18,15 @@ pub enum Token {
   #[token("let")]
   Let,
 
+  #[token("if")]
+  If,
+
+  #[token("else")]
+  Else,
+
+  #[token("while")]
+  While,
+
   #[token("uint")]
   Uint,
 

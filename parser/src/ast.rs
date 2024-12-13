@@ -5,6 +5,7 @@ pub enum Expr {
   Literal(i64, Option<Type>),
   Variable(String, Option<Type>),
   BinaryOp(Box<Expr>, String, Box<Expr>, Option<Type>),
+  Assign(String, Box<Expr>, Option<Type>),
 }
 
 impl Expr {
@@ -13,6 +14,7 @@ impl Expr {
       Expr::Literal(_, ty) => ty.clone(),
       Expr::Variable(_, ty) => ty.clone(),
       Expr::BinaryOp(_, _, _, ty) => ty.clone(),
+      Expr::Assign(_, _, ty) => ty.clone(),
     }
   }
 }

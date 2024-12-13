@@ -1,5 +1,7 @@
 mod compiler;
 mod instruction;
+mod oir;
+mod registeralloc;
 use compiler::Compiler;
 use parser::ast::Stmt;
 

@@ -2,9 +2,9 @@ use lexer::lex;
 use parser;
 
 fn main() {
-  let str = "{ 
-    let x = 42 + 1 * 3; 
-    let y = x;
+  let str = "{
+    let x = 42 + 1 * 3;
+    x = x + 1;
   }";
   match lex(str) {
     Ok(tokens) => {

@@ -8,6 +8,8 @@ Below is the grammer for the language written in **BNF (Backus-Naur Form)**.
 \begin{align}
 &\langle program \rangle && \Coloneqq &&\langle statement \rangle* \\ \\
 &\langle statement \rangle && \Coloneqq &&\langle declaration \rangle \\
-&&&&& | \langle assignment \rangle
+&&&&& | \langle assignment \rangle\\
+&&&&& | \langle expression \rangle\\\\
+&\langle declaration \rangle && \Coloneqq &&"let" \quad \langle identifier \rangle \quad ":" \quad \langle type \rangle \quad "=" \quad \langle expression \rangle \quad ";"
 \end{align}
 ```

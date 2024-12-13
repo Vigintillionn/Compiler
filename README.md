@@ -19,7 +19,7 @@ Below is the grammer for the language written in **BNF (Backus-Naur Form)**.
 \\
 &\langle block \rangle && \Coloneqq && "{" \quad \langle statement \rangle * \quad "}" \\
 \\
-&\langle expression \rangle && \Coloneqq && \langle literal \rangle
+&\langle expression \rangle && \Coloneqq && \langle literal \rangle \\
 &&&&& \langle identifier \rangle \\
 &&&&& \langle expression \rangle \quad "+" \quad \langle expression \rangle \\
 &&&&& \langle expression \rangle \quad "-" \quad \langle expression \rangle \\
@@ -31,7 +31,7 @@ Below is the grammer for the language written in **BNF (Backus-Naur Form)**.
 &\langle parameter \rangle && \Coloneqq && \langle identifier \rangle \quad ":" \quad \langle type \rangle \\
 \\
 &\langle type \rangle && \Coloneqq && "int" | "uint" | "bool" | "string" | "void" \\
-&&&&& "fn" \quad "(" \quad \langle parameter-list \rangle \quad ")" \quad "->" \quad \langle type \rangle
+&&&&& "fn" \quad "(" \quad \langle parameter-list \rangle \quad ")" \quad "\to" \quad \langle type \rangle
 
 \end{align}
 ```

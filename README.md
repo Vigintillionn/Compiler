@@ -31,7 +31,7 @@ Below is the grammer for the language written in **BNF (Backus-Naur Form)**.
 &\langle parameter \rangle && \Coloneqq && \langle identifier \rangle \quad ":" \quad \langle type \rangle \\
 \\
 &\langle type \rangle && \Coloneqq && "int" | "uint" | "bool" | "string" | "void" \\
-&&&&& "fn" \quad "(" \quad \langle parameter-list \rangle \quad ")" \quad "\to" \quad \langle type \rangle
+&&&&& | "fn" \quad "(" \quad \langle parameter-list \rangle \quad ")" \quad "\to" \quad \langle type \rangle
 
 \end{align}
 ```

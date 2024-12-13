@@ -56,6 +56,17 @@ impl Compiler {
           self.compile_stmt(stmt);
         }
       },
+      Stmt::While(expr, block) => {
+        let mut instructions = InstructionSet::default();
+        let label = format!("L{}", self.instructions.len());
+        instructions.add(Instruction::new_label(&label));
+        self.compile_expr(expr, &mut instructions);
+        instructions.add(Instruction::from("beqz a0, L1".to_string()));
+        self.instructions.extend(instructions);
+
+        self.compile_stmt(block);
+        self.instructions.add(Instruction::from(format!("j {}", label)));
+      },
       _ => unimplemented!(),
     }
   }

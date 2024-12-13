@@ -44,6 +44,10 @@ impl InstructionSet {
     }
   }
 
+  pub fn len(&self) -> usize {
+    self.instructions.len()
+  }
+
   pub fn add(&mut self, instr: Instruction) {
     self.instructions.push(instr);
   }

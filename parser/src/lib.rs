@@ -114,7 +114,7 @@ fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
       }
       Token::Number(n) => output.push(Expr::Literal(*n, Some(Type::Int))),
       Token::Identifier(name) => output.push(Expr::Variable(name.clone(), Some(Type::Int))), // Type inference happens later
-      Token::Semicolon => break,
+      Token::Semicolon | Token::LBrace => break,
       _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
     }
     input = input_next;

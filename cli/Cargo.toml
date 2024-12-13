@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 parser = { path = "../parser" }
 lexer = { path = "../lexer" }
+compiler = { path = "../compiler" }

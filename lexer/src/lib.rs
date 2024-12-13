@@ -12,8 +12,23 @@ pub enum Token {
   #[token("fn")]
   Function,
 
+  #[token("return")]
+  Return,
+
   #[token("let")]
   Let,
+
+  #[token("uint")]
+  Uint,
+
+  #[token("int")]
+  Int,
+
+  #[token("string")]
+  StringType,
+
+  #[token("->")]
+  Arrow,
 
   #[token("(")]
   LParen,
@@ -27,8 +42,14 @@ pub enum Token {
   #[token("}")]
   RBrace,
 
+  #[token(":")]
+  Colon,
+
   #[token(";")]
   Semicolon,
+
+  #[token(",")]
+  Comma,
 
   #[token("=")]
   Assign,

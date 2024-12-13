@@ -1,14 +1,15 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
+mod compiler;
+mod instruction;
+use compiler::Compiler;
+use parser::ast::Stmt;
+
+pub fn compile(stmt: &Stmt) {
+  let mut compiler = Compiler::new();
+
+  compiler.compile(stmt, "out/output.asm");
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
 }

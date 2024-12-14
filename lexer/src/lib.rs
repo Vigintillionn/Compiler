@@ -66,6 +66,21 @@ pub enum Token {
   #[token("==")]
   Equals,
 
+  #[token("!=")]
+  NEquals,
+
+  #[token("<=")]
+  LTEqual,
+
+  #[token(">=")]
+  GTEqual,
+
+  #[token("<")]
+  LArrow,
+
+  #[token(">")]
+  RArrow,
+
   #[token("+")]
   Plus,
 
@@ -87,9 +102,10 @@ pub fn lex(input: &str) -> Result<Vec<Token>, String> {
 
 pub fn operator_precedence(op: &Token) -> Option<u8> {
   match op {
-    Token::Plus | Token::Minus => Some(1),
-    Token::Star | Token::Slash => Some(2),
-    Token::Equals => Some(3),
+    Token::Equals | Token::NEquals | Token::LArrow | Token::RArrow |
+    Token::LTEqual | Token::GTEqual => Some(1),
+    Token::Plus | Token::Minus => Some(2),
+    Token::Star | Token::Slash => Some(3),
     _ => None,
   }
 }
@@ -108,6 +124,11 @@ pub fn operator_to_string(op: &Token) -> String {
     Token::Star => "*".to_string(),
     Token::Slash => "/".to_string(),
     Token::Equals => "==".to_string(),
+    Token::NEquals => "!=".to_string(),
+    Token::LTEqual => "<=".to_string(),
+    Token::LArrow => "<".to_string(),
+    Token::GTEqual => ">=".to_string(),
+    Token::RArrow => ">".to_string(),
     _ => "".to_string(),
   }
 }

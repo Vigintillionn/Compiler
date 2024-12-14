@@ -7,8 +7,6 @@ pub struct Compiler {
   variables: HashMap<String, i32>,  // Maps variables to stack offsets
   stack_offset: i32,                // Current stack offset
   instructions: InstructionSet,     // The set of instructions built by the compiler
-  register_allocations: HashMap<String, String>, // Maps variables to registers
-  register_spills: HashMap<String, i32>, // Maps spilled variables to stack offsets
 }
 
 impl Compiler {
@@ -17,19 +15,22 @@ impl Compiler {
       variables: HashMap::new(),
       stack_offset: 0,
       instructions: InstructionSet::new(),
-      register_allocations: HashMap::new(),
-      register_spills: HashMap::new(),
     }
   }
 
   pub fn compile(&mut self, stmts: &Stmt, file_name: &str) {
-    self.register_allocations = InferenceGraph::from_ast(stmts).get_allocations();
+    // self.register_allocations = InferenceGraph::from_ast(stmts).get_allocations();
     self.compile_stmt(stmts);
     self.instructions.export(file_name).unwrap();
   }
 
   fn compile_stmt(&mut self, stmt: &Stmt) {
     match stmt {
+      Stmt::Block(stmts) | Stmt::Program(stmts) => {
+        for stmt in stmts {
+          self.compile_stmt(stmt);
+        }
+      },
       Stmt::Expr(expr) => {
         let mut instructions = InstructionSet::default();
         self.compile_expr(expr, &mut instructions);
@@ -51,21 +52,37 @@ impl Compiler {
         instructions.add(Instruction::from(format!("sw a0, {}(sp)", self.stack_offset)));
         self.instructions.extend(instructions);
       },
-      Stmt::Block(stmts) => {
-        for stmt in stmts {
-          self.compile_stmt(stmt);
-        }
-      },
       Stmt::While(expr, block) => {
         let mut instructions = InstructionSet::default();
-        let label = format!("L{}", self.instructions.len());
-        instructions.add(Instruction::new_label(&label));
+        let start_label = format!("L{}", self.instructions.len());
+        let end_label = format!("L{}", self.instructions.len() + 1);
+        instructions.add(Instruction::new_label(&start_label));
         self.compile_expr(expr, &mut instructions);
-        instructions.add(Instruction::from("beqz a0, L1".to_string()));
+        instructions.add(Instruction::from(format!("beqz a0, {}", end_label)));
         self.instructions.extend(instructions);
 
         self.compile_stmt(block);
-        self.instructions.add(Instruction::from(format!("j {}", label)));
+        self.instructions.add(Instruction::from(format!("j {}", start_label)));
+        self.instructions.add(Instruction::new_label(&end_label));
+      },
+      Stmt::If(cond, then, else_then) => {
+        let mut instructions = InstructionSet::default();
+        self.compile_expr(cond, &mut instructions);
+
+        let else_label = format!("L{}", self.instructions.len());
+        let end_label = format!("L{}", self.instructions.len() + 1);
+        instructions.add(Instruction::from(format!("beqz a0, {}", if else_then.is_some() { &else_label } else { &end_label })));
+
+        self.instructions.extend(instructions);
+        self.compile_stmt(then);
+
+        if let Some(else_then) = else_then {
+          self.instructions.add(Instruction::from(format!("j {}", end_label)));
+          self.instructions.add(Instruction::new_label(&else_label));
+          self.compile_stmt(else_then);
+        }
+
+        self.instructions.add(Instruction::new_label(&end_label));
       },
       _ => unimplemented!(),
     }
@@ -126,34 +143,29 @@ impl Compiler {
           "-" => instructions.add(Instruction::from("sub a0, t0, a0".to_string())),
           "*" => instructions.add(Instruction::from("mul a0, t0, a0".to_string())),
           "/" => instructions.add(Instruction::from("div a0, t0, a0".to_string())),
+          "<" => instructions.add(Instruction::from("slt a0, a0, t0".to_string())),
+          "<=" => {
+            instructions.add(Instruction::from("slt a0, a0, t0".to_string()));
+            instructions.add(Instruction::from("xori a0, a0, 1".to_string()));
+          },
+          ">" => instructions.add(Instruction::from("slt a0, t0, a0".to_string())),
+          ">=" => {
+            instructions.add(Instruction::from("slt a0, t0, a0".to_string()));
+            instructions.add(Instruction::from("xori a0, a0, 1".to_string()));
+          },
+          "==" => {
+            instructions.add(Instruction::from("sub a0, t0, a0".to_string()));
+            instructions.add(Instruction::from("seqz a0, a0".to_string()));
+          },
+          "!=" => {
+            instructions.add(Instruction::from("sub a0, t0, a0".to_string()));
+            instructions.add(Instruction::from("snez a0, a0".to_string()));
+          }
           _ => unimplemented!(),
         };
 
         ty.as_ref().expect("Type not inferred").clone()
       }
-    }
-  }
-
-  fn get_register(&mut self, var: &str) -> String {
-    if let Some(reg) = self.register_allocations.get(var) {
-      return reg.clone()
-    }
-
-    if !self.variables.contains_key(var) {
-      self.stack_offset -= 4;
-      self.register_spills.insert(var.to_string(), self.stack_offset);
-    }
-
-    format!("{}(sp)", self.variables.get(var).unwrap())
-  }
-
-  fn generate_variable_instr(&mut self, var: &str, is_load: bool) -> String {
-    let location = self.get_register(var);
-
-    if is_load {
-      format!("lw a0, {}", location)
-    } else {
-      format!("sw a0, {}", location)
     }
   }
 }

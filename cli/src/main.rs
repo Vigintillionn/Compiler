@@ -2,12 +2,20 @@ use lexer::lex;
 use parser;
 
 fn main() {
-  let str = "while 1 { let y = 1; }";
+  let str = "
+    let x = 2; 
+    if x <= 3 { 
+      while 1 { 
+        let x = 3; 
+      } 
+    } 
+    let y = 3;
+  ";
   match lex(str) {
     Ok(tokens) => {
       println!("{:?}", tokens);
-      let (_, stmt) = parser::parse(&tokens).unwrap();
-      println!("{:?}", stmt);
+      let stmt = parser::parse(&tokens).unwrap();
+      stmt.print(0);
       compiler::compile(&stmt);
     },
     Err(e) => {

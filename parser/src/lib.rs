@@ -1,20 +1,34 @@
 pub mod ast;
 pub mod types;
+
 use ast::{Stmt, Expr};
 use types::Type;
 use lexer::{operator_precedence, operator_to_string, Token};
 use nom::{branch::alt, combinator::{map, opt}, multi::{many0, separated_list0}, sequence::{delimited, preceded, tuple}, IResult};
 
-pub fn parse(input: &[Token]) -> IResult<&[Token], Stmt> {
-  let (input, stmts) = parse_statement(input)?;
-  Ok((input, stmts))
+pub fn parse(input: &[Token]) -> Result<Stmt, String> {
+  let mut input = input;
+  let mut statements = Vec::new();
+
+  while let Ok((remaining_input, stmt)) = parse_statement(input) {
+    statements.push(stmt);
+    input = remaining_input
+  }
+  
+  if !input.is_empty() {
+    Err(format!("Unexpected tokens remaining: {:?}", input))
+  } else {
+    Ok(Stmt::Program(statements))
+  }
 }
 
 fn parse_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
   alt((
     parse_let_statement,
     parse_while_statement,
-    parse_block,
+    parse_if_statement,
+    // parse_block,
+    map(delimited(tag(&Token::LBrace), many0(parse_statement), tag(&Token::RBrace)), Stmt::Block),
     map(parse_expression, Stmt::Expr)
   ))(input)
 }
@@ -33,12 +47,21 @@ fn parse_let_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
   Ok((input, Stmt::Let(identifier, expr, ty)))
 }
 
+fn parse_if_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
+  let (input, _) = tag(&Token::If)(input)?;
+  let (input, cond) = parse_expression(input)?;
+  let (input, then) = parse_block(input)?;
+  let (input, else_do) = opt(preceded(tag(&Token::Else), parse_block))(input)?;
+
+  Ok((input, Stmt::If(cond, Box::new(then), else_do.map(Box::new))))
+}
+
 fn parse_while_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
   let (input, _) = tag(&Token::While)(input)?;
   let (input, condition) = parse_expression(input)?;
   let (input, body) = parse_block(input)?;
 
-  Ok((input, Stmt::While(Box::new(condition), Box::new(body))))
+  Ok((input, Stmt::While(condition, Box::new(body))))
 }
 
 fn parse_type(input: &[Token]) -> IResult<&[Token], Type> {
@@ -47,6 +70,7 @@ fn parse_type(input: &[Token]) -> IResult<&[Token], Type> {
     map(tag(&Token::Int), |_| Type::Int),
     map(tag(&Token::StringType), |_| Type::String),
 
+    // pointer: *int
     map(
       preceded(tag(&Token::Star), parse_type),
       |pointee| Type::Pointer(Box::new(pointee))
@@ -67,9 +91,10 @@ fn parse_type(input: &[Token]) -> IResult<&[Token], Type> {
 }
 
 fn parse_block(input: &[Token]) -> IResult<&[Token], Stmt> {
-  let (input, _) = tag(&Token::LBrace)(input)?;
-  let (input, stmts) = many0(parse_statement)(input)?;
-  let (input, _) = tag(&Token::RBrace)(input)?;
+  // let (input, _) = tag(&Token::LBrace)(input)?;
+  // let (input, stmts) = many0(parse_statement)(input)?;
+  // let (input, _) = tag(&Token::RBrace)(input)?;
+  let (input, stmts) = delimited(tag(&Token::LBrace), many0(parse_statement), tag(&Token::RBrace))(input)?;
 
   Ok((input, Stmt::Block(stmts))) 
 }
@@ -83,7 +108,6 @@ fn parse_identifier(input: &[Token]) -> IResult<&[Token], String> {
 }
 
 fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
-  println!("parse_expression: {:?}", input);
   let mut input = input;
   let mut output = Vec::new();
   let mut op_stack: Vec<&Token> = Vec::new();
@@ -99,7 +123,8 @@ fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
           return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
         }
       },
-      Token::Plus | Token::Minus | Token::Star | Token::Slash => {
+      Token::Plus | Token::Minus | Token::Star | Token::Slash |
+      Token::Equals | Token::NEquals | Token::GTEqual | Token::LTEqual | Token::LArrow | Token::RArrow => {
         while let Some(top_op) = op_stack.last() {
           if operator_precedence(top_op) >= operator_precedence(token) {
             let rhs = output.pop().expect("Expected right-hand side of binary operation");

@@ -34,7 +34,7 @@ Below is the grammer for the language written in **BNF (Backus-Naur Form)**.
 &&&&& | \langle block \rangle\\
 &&&&& | \langle expression \rangle\\
 \\
-&\langle declaration \rangle && \Coloneqq &&"let" \quad \langle identifier \rangle \quad ":" \quad \langle type \rangle \quad "=" \quad \langle expression \rangle \quad ";" \\
+&\langle declaration \rangle && \Coloneqq &&"let" \quad \langle identifier \rangle \quad ( \quad ":" \quad \langle type \rangle \quad ) \quad "=" \quad \langle expression \rangle \quad ";" \\
 \\
 &\langle assignment \rangle && \Coloneqq && \langle identifier \rangle \quad "=" \quad \langle expression \rangle \\
 \\

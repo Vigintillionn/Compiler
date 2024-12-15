@@ -3,13 +3,9 @@ use parser;
 
 fn main() {
   let str = "
-    let x = 2; 
-    if x <= 3 { 
-      while 1 { 
-        let x = 3; 
-      } 
-    } 
-    let y = 3;
+    let x = 2;
+    let y: uint = 1 + x + 2;
+    let z = true;
   ";
   match lex(str) {
     Ok(tokens) => {

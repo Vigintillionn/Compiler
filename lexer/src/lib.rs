@@ -33,6 +33,15 @@ pub enum Token {
   #[token("int")]
   Int,
 
+  #[token("bool")]
+  Bool,
+
+  #[token("true")]
+  True,
+
+  #[token("false")]
+  False,
+
   #[token("string")]
   StringType,
 

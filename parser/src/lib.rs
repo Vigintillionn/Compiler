@@ -1,7 +1,7 @@
 pub mod ast;
 pub mod types;
 
-use ast::{Stmt, Expr};
+use ast::{Expr, Literal, Stmt};
 use types::Type;
 use lexer::{operator_precedence, operator_to_string, Token};
 use nom::{branch::alt, combinator::{map, opt}, multi::{many0, separated_list0}, sequence::{delimited, preceded, tuple}, IResult};
@@ -69,6 +69,7 @@ fn parse_type(input: &[Token]) -> IResult<&[Token], Type> {
     map(tag(&Token::Uint), |_| Type::Uint),
     map(tag(&Token::Int), |_| Type::Int),
     map(tag(&Token::StringType), |_| Type::String),
+    map(tag(&Token::Bool), |_| Type::Bool),
 
     // pointer: *int
     map(
@@ -137,7 +138,9 @@ fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
         }
         op_stack.push(token);
       }
-      Token::Number(n) => output.push(Expr::Literal(*n, Some(Type::Int))),
+      Token::Number(n) => output.push(Expr::Literal(Literal::Integer(*n), Some(Type::Int))),
+      Token::True => output.push(Expr::Literal(Literal::Boolean(true), Some(Type::Bool))),
+      Token::False => output.push(Expr::Literal(Literal::Boolean(false), Some(Type::Bool))),
       Token::Identifier(name) => output.push(Expr::Variable(name.clone(), Some(Type::Int))), // Type inference happens later
       Token::Semicolon | Token::LBrace => break,
       _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))

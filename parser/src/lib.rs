@@ -151,7 +151,6 @@ fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
     match token {
       Token::Plus | Token::Minus | Token::Star | Token::Slash |
       Token::Equals | Token::NEquals | Token::GTEqual | Token::LTEqual | Token::LArrow | Token::RArrow => {
-        input = &input[1..];
         while let Some(top_op) = op_stack.last() {
           if operator_precedence(top_op) >= operator_precedence(token) {
             let rhs = output.pop().expect("Expected right-hand side of binary operation");
@@ -164,24 +163,13 @@ fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
         }
         op_stack.push(token);
       }
-      Token::Number(n) => {
-        input = &input[1..];
-        output.push(Expr::Literal(Literal::Integer(*n), Some(Type::Int)))
-      },
-      Token::True => {
-        input = &input[1..];
-        output.push(Expr::Literal(Literal::Boolean(true), Some(Type::Bool)))
-      },
-      Token::False => {
-        input = &input[1..];
-        output.push(Expr::Literal(Literal::Boolean(false), Some(Type::Bool)))
-      },
-      Token::Identifier(name) => {
-        input = &input[1..];
-        output.push(Expr::Variable(name.clone(), Some(Type::Int)))
-      },
+      Token::Number(n) => output.push(Expr::Literal(Literal::Integer(*n), Some(Type::Int))),
+      Token::True => output.push(Expr::Literal(Literal::Boolean(true), Some(Type::Bool))),
+      Token::False => output.push(Expr::Literal(Literal::Boolean(false), Some(Type::Bool))),
+      Token::Identifier(name) => output.push(Expr::Variable(name.clone(), Some(Type::Int))),
       _ => break
     }
+    input = &input[1..];
   }
 
   while let Some(op) = op_stack.pop() {

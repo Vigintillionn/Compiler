@@ -3,9 +3,8 @@ use parser;
 
 fn main() {
   let str = "
-    let x = 2;
-    let y: uint = 1 + x + 2;
-    let z = true;
+    for (;;) {
+    x = x + 1;}
   ";
   match lex(str) {
     Ok(tokens) => {

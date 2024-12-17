@@ -79,11 +79,12 @@ impl Expr {
 
 #[derive(Debug)]
 pub enum Stmt {
-  Program(Vec<Stmt>),                 // Program
+  Program(Vec<Stmt>),                                       // Program
   Expr(Expr),
-  Let(String, Expr, Option<Type>),    // Variable declaration
-  Block(Vec<Stmt>),                   // Scope / Block
-  While(Expr, Box<Stmt>),        // While loop
+  Let(String, Expr, Option<Type>),                          // Variable declaration
+  Block(Vec<Stmt>),                                         // Scope / Block
+  While(Expr, Box<Stmt>),                                   // While loop
+  For(Option<Box<Stmt>>, Option<Expr>, Option<Box<Stmt>>, Box<Stmt>),       // For loop
   If(Expr, Box<Stmt>, Option<Box<Stmt>>),
 }
 
@@ -115,7 +116,21 @@ impl Stmt {
         //   println!("  {}ELSE", indent_str);
         //   otherwise.print(indent+1);
         // }
-      } 
+      },
+      Stmt::For(init, cond, post, block) => {
+        println!("{}ForStmt", indent_str);
+        if let Some(init) = init {
+          init.print(indent + 1);
+        }
+        if let Some(cond) = cond {
+          cond.print(indent + 1);
+        }
+        if let Some(post) = post {
+          post.print(indent + 1);
+        }
+        block.print(indent + 1);
+      },
+      _ => unimplemented!()
     }
   }
 }

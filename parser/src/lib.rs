@@ -4,7 +4,7 @@ pub mod types;
 use ast::{Expr, Literal, Stmt};
 use types::Type;
 use lexer::{operator_precedence, operator_to_string, Token};
-use nom::{branch::alt, combinator::{map, opt}, multi::{many0, separated_list0}, sequence::{delimited, preceded, tuple}, IResult};
+use nom::{branch::alt, combinator::{map, opt}, multi::{many0, separated_list0}, sequence::{delimited, preceded, terminated, tuple}, IResult};
 
 pub fn parse(input: &[Token]) -> Result<Stmt, String> {
   let mut input = input;
@@ -16,7 +16,7 @@ pub fn parse(input: &[Token]) -> Result<Stmt, String> {
   }
   
   if !input.is_empty() {
-    Err(format!("Unexpected tokens remaining: {:?}", input))
+    Err(format!("Unexpected tokens remaining: {:?}\nManaged to parse: {:?}", input, statements))
   } else {
     Ok(Stmt::Program(statements))
   }
@@ -26,10 +26,12 @@ fn parse_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
   alt((
     parse_let_statement,
     parse_while_statement,
+    parse_for_statement,
     parse_if_statement,
-    // parse_block,
+    parse_block,
+    terminated(parse_assign_stmt, tag(&Token::Semicolon)),
     map(delimited(tag(&Token::LBrace), many0(parse_statement), tag(&Token::RBrace)), Stmt::Block),
-    map(parse_expression, Stmt::Expr)
+    // map(terminated(parse_expression, tag(&Token::Semicolon)), Stmt::Expr)
   ))(input)
 }
 
@@ -43,7 +45,7 @@ fn parse_let_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
   let (input, _) = tag(&Token::Assign)(input)?;
   let (input, expr) = parse_expression(input)?;
   let (input, _) = tag(&Token::Semicolon)(input)?;
-
+  
   Ok((input, Stmt::Let(identifier, expr, ty)))
 }
 
@@ -62,6 +64,28 @@ fn parse_while_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
   let (input, body) = parse_block(input)?;
 
   Ok((input, Stmt::While(condition, Box::new(body))))
+}
+
+fn parse_for_statement(input: &[Token]) -> IResult<&[Token], Stmt> {
+  let (input, _) = tag(&Token::For)(input)?;
+  let (input, _) = tag(&Token::LParen)(input)?;
+  let (mut input, initializer) = opt(
+    alt((
+      parse_let_statement,
+      terminated(parse_assign_stmt, tag(&Token::Semicolon))
+    )))(input)?;
+
+  if initializer.is_none() {
+    let (remaining, _) = tag(&Token::Semicolon)(input)?;
+    input = remaining;
+  }
+  
+  let (input, condition) = opt(parse_expression)(input)?;
+  let (input, _) = tag(&Token::Semicolon)(input)?;
+  let (input, updater) = terminated(opt(parse_assign_stmt), tag(&Token::RParen))(input)?; //map(parse_expression, Stmt::Expr)(input)?;
+  let (input, body) = parse_block(input)?;
+
+  Ok((input, Stmt::For(initializer.map(Box::new), condition, updater.map(Box::new), Box::new(body))))
 }
 
 fn parse_type(input: &[Token]) -> IResult<&[Token], Type> {
@@ -92,10 +116,11 @@ fn parse_type(input: &[Token]) -> IResult<&[Token], Type> {
 }
 
 fn parse_block(input: &[Token]) -> IResult<&[Token], Stmt> {
-  // let (input, _) = tag(&Token::LBrace)(input)?;
-  // let (input, stmts) = many0(parse_statement)(input)?;
-  // let (input, _) = tag(&Token::RBrace)(input)?;
-  let (input, stmts) = delimited(tag(&Token::LBrace), many0(parse_statement), tag(&Token::RBrace))(input)?;
+  let (input, stmts) = delimited(
+    tag(&Token::LBrace), 
+    many0(parse_statement), 
+    tag(&Token::RBrace)
+  )(input)?;
 
   Ok((input, Stmt::Block(stmts))) 
 }
@@ -108,24 +133,25 @@ fn parse_identifier(input: &[Token]) -> IResult<&[Token], String> {
   }
 }
 
+fn parse_assign_stmt(input: &[Token]) -> IResult<&[Token], Stmt> {
+  let (input, identifier) = parse_identifier(input)?;
+  let (input, _) = tag(&Token::Assign)(input)?;
+  let (input, expr) = parse_expression(input)?;
+
+  Ok((input, Stmt::Expr(Expr::Assign(identifier, Box::new(expr), None))))
+}
+
 fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
   let mut input = input;
   let mut output = Vec::new();
   let mut op_stack: Vec<&Token> = Vec::new();
   
   // TODO: Add support for unary operators, parentheses, and function calls
-  while let Some((token, input_next)) = input.split_first() {
+  while let Some(token) = input.first() {
     match token {
-      Token::Assign => {
-        if let Some(Expr::Variable(var_name, _)) = output.pop() {
-          let (remaining_input, rhs) = parse_expression(input_next)?;
-          return Ok((remaining_input, Expr::Assign(var_name, Box::new(rhs), Some(Type::Int))));
-        } else {
-          return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)));
-        }
-      },
       Token::Plus | Token::Minus | Token::Star | Token::Slash |
       Token::Equals | Token::NEquals | Token::GTEqual | Token::LTEqual | Token::LArrow | Token::RArrow => {
+        input = &input[1..];
         while let Some(top_op) = op_stack.last() {
           if operator_precedence(top_op) >= operator_precedence(token) {
             let rhs = output.pop().expect("Expected right-hand side of binary operation");
@@ -138,14 +164,24 @@ fn parse_expression(input: &[Token]) -> IResult<&[Token], Expr> {
         }
         op_stack.push(token);
       }
-      Token::Number(n) => output.push(Expr::Literal(Literal::Integer(*n), Some(Type::Int))),
-      Token::True => output.push(Expr::Literal(Literal::Boolean(true), Some(Type::Bool))),
-      Token::False => output.push(Expr::Literal(Literal::Boolean(false), Some(Type::Bool))),
-      Token::Identifier(name) => output.push(Expr::Variable(name.clone(), Some(Type::Int))), // Type inference happens later
-      Token::Semicolon | Token::LBrace => break,
-      _ => return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))
+      Token::Number(n) => {
+        input = &input[1..];
+        output.push(Expr::Literal(Literal::Integer(*n), Some(Type::Int)))
+      },
+      Token::True => {
+        input = &input[1..];
+        output.push(Expr::Literal(Literal::Boolean(true), Some(Type::Bool)))
+      },
+      Token::False => {
+        input = &input[1..];
+        output.push(Expr::Literal(Literal::Boolean(false), Some(Type::Bool)))
+      },
+      Token::Identifier(name) => {
+        input = &input[1..];
+        output.push(Expr::Variable(name.clone(), Some(Type::Int)))
+      },
+      _ => break
     }
-    input = input_next;
   }
 
   while let Some(op) = op_stack.pop() {

@@ -1,6 +1,6 @@
 use logos::{Logos, Lexer};
 
-#[derive(Logos, Debug, PartialEq)]
+#[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
   #[regex(r"[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
@@ -27,6 +27,9 @@ pub enum Token {
   #[token("while")]
   While,
 
+  #[token("for")]
+  For,
+
   #[token("uint")]
   Uint,
 
@@ -41,6 +44,9 @@ pub enum Token {
 
   #[token("false")]
   False,
+
+  #[token("as")]
+  As,
 
   #[token("string")]
   StringType,
@@ -89,6 +95,9 @@ pub enum Token {
 
   #[token(">")]
   RArrow,
+
+  #[token("++")]
+  Increment,
 
   #[token("+")]
   Plus,

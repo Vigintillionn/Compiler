@@ -81,6 +81,12 @@ impl Compiler {
 
         self.instructions.add(Instruction::new_label(&end_label));
       },
+      Stmt::For(init, cond, post, block) => {
+        println!("{:?}", init);
+        println!("{:?}", cond);
+        println!("{:?}", post);
+        println!("{:?}", block);
+      },
       _ => unimplemented!(),
     }
   }

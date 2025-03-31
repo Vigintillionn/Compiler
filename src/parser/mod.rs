@@ -1,6 +1,6 @@
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use crate::Token;
-use framework::{alt, delimited, many, map, opt, seperated_list, terminated, Choice, Parser as ParserTrait};
+use framework::{alt, delimited, many, map, opt, preceded, seperated_list, terminated, Choice, Parser as ParserTrait};
 use ast::{Expr, ExprKind, Program, Stmt, Type, LiteralValue};
 
 pub mod ast;
@@ -184,8 +184,20 @@ impl<'a> Parser<'a> {
   
     while let Some(token) = tokens.first() {
       match token {
-        Token::Identifier(name) => output.push(Expr(ExprKind::Ident(name.clone()), RefCell::new(None))),
-        Token::Number(n) => output.push(Expr(ExprKind::Literal(LiteralValue::Float(*n)),RefCell::new(Some(Type::Int)))), // TODO: Handle typing
+        Token::Identifier(name) => {
+          if tokens.len() > 1 && tokens[1] == Token::OpenParen {
+            tokens = &tokens[1..];
+            let (args, rest) = delimited(Token::OpenParen, seperated_list(Self::parse_expr, Token::Comma), Token::CloseParen)(tokens)?;
+            output.push(Expr(ExprKind::Call(name.clone(), args), RefCell::new(None)));
+            tokens = rest;
+            break;
+          } else {
+            output.push(Expr(ExprKind::Ident(name.clone()), RefCell::new(None)))
+          }
+        },
+        Token::IntLiteral(n) => output.push(Expr(ExprKind::Literal(LiteralValue::Integer(*n)),RefCell::new(Some(Type::Int)))), // TODO: Handle typing
+        Token::FloatLiteral(f) => output.push(Expr(ExprKind::Literal(LiteralValue::Float(*f)), RefCell::new(Some(Type::Float)))), // TODO: Handle typing
+        Token::BoolLiteral(b) => output.push(Expr(ExprKind::Literal(LiteralValue::Boolean(*b)), RefCell::new(Some(Type::Boolean)))), // TODO: Handle typing
         _ if token.op_info().is_some() => {
           let op_info = token.op_info().expect("Token op_info is None"); // token.op_info() is not None
           while let Some(&top_op) = op_stack.last() {
@@ -205,6 +217,8 @@ impl<'a> Parser<'a> {
       }
       tokens = &tokens[1..];
     }
+
+    println!("output: {:?}", output);
   
     while let Some(op) = op_stack.pop() {
       let lhs = output.pop().unwrap();
@@ -220,9 +234,36 @@ impl<'a> Parser<'a> {
   }
 
   fn parse_type(tokens: &'a [Token]) -> Result<(Type, &'a [Token]), String> {
+    let parse_f_type = |tokens: &'a [Token]| {
+      let (_, tokens) = Token::Proc.parse(tokens)?;
+      let (args, tokens) = delimited(
+        Token::OpenParen,
+        seperated_list(
+          Self::parse_type, 
+          Token::Comma
+        ),
+      Token::CloseParen
+      )(tokens)?;
+
+      let (_, tokens) = Token::Arrow.parse(tokens)?;
+      let (ret_ty, tokens) = Self::parse_type(tokens)?;
+
+      Ok((Type::Function(args, Box::new(ret_ty)), tokens))
+    };
+
     let (ty, tokens) = alt((
       map(Token::Int, |_| Type::Int),
       map(Token::Bool, |_| Type::Boolean),
+      map(Token::Float, |_| Type::Float),
+      map(Token::Str, |_| Type::String),
+      map(
+        preceded(
+          Token::Asterisk, 
+          Self::parse_type
+        ),
+        |ty| Type::Pointer(Box::new(ty))
+      ),
+      parse_f_type,
     ))(tokens)?;
 
     Ok((ty, tokens))

@@ -124,8 +124,15 @@ impl<'a> Lexer<'a> {
 
   fn tokenize_number(&mut self) -> LexerResult<(Token, usize)> {
     let (num, bytes) = self.take_while(|c| c.is_digit(10) || c == '.');
-    let num = num.parse().map_err(|_| LexerError::InvalidNumber(num.to_string(), self.pos))?;
-    Ok((Token::Number(num), bytes))
+    if num.contains('.') {
+      let num = num.parse::<f64>()
+        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.pos))?;
+      Ok((Token::FloatLiteral(num), bytes))
+    } else {
+      let num = num.parse::<i64>()
+        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.pos))?;
+      Ok((Token::IntLiteral(num), bytes))
+    }
   }
 
   fn tokenize_ident(&mut self) -> LexerResult<(Token, usize)> {

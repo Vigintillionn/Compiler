@@ -10,6 +10,7 @@ mod keywords {
     "false" => BoolLiteral(false),
     "int" => Int,  
     "bool" => Bool,
+    "str" => Str,
     "for" => For,
     "while" => While,
     "loop" => Loop,
@@ -24,7 +25,8 @@ pub enum Token {
   
   /* Literals */
   StringLiteral(String),
-  Number(f64),
+  IntLiteral(i64),
+  FloatLiteral(f64),
   BoolLiteral(bool),
 
   /* Keywords */

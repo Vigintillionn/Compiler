@@ -13,7 +13,8 @@ pub enum Type {
   String,
   Boolean,
   Function(Vec<Type>, Box<Type>),
-  Void
+  Void,
+  Pointer(Box<Type>),
 }
 
 #[derive(Debug)]
@@ -46,7 +47,8 @@ pub struct Expr(pub ExprKind, pub RefCell<Option<Type>>);
 pub enum ExprKind {
   Literal(LiteralValue),
   Ident(String),
-  BinaryOp(Box<Expr>, Op, Box<Expr>)
+  BinaryOp(Box<Expr>, Op, Box<Expr>),
+  Call(String, Vec<Expr>),
 }
 
 #[derive(Debug)]

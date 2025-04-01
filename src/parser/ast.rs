@@ -6,7 +6,7 @@ type Block = Vec<Stmt>;
 #[derive(Debug)]
 pub struct Program(pub Block);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
   Int,
   Float,
@@ -17,18 +17,19 @@ pub enum Type {
   Pointer(Box<Type>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt {
   Block(Block),
-  If(Expr, Box<Stmt>, Box<Option<Stmt>>),
+  If(Expr, Box<Stmt>, Option<Box<Stmt>>),
   Var(String, Expr, RefCell<Option<Type>>),
   Assign(String, Expr),
   Loop(Option<Box<Stmt>>, Option<Expr>, Option<Box<Stmt>>, Box<Stmt>),
   Ret(Option<Expr>),
   Function(String, Vec<(String, Type)>, Type, Box<Stmt>),
+  Expr(Expr),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LiteralValue {
   Integer(i64),
   Float(f64),
@@ -36,22 +37,21 @@ pub enum LiteralValue {
   Boolean(bool)
 }
 
-#[derive(Debug)]
-// pub struct Expr {
-//   pub kind: ExprKind,
-//   pub ty: RefCell<Option<Type>>,
-// }
+#[derive(Debug, Clone)]
 pub struct Expr(pub ExprKind, pub RefCell<Option<Type>>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprKind {
   Literal(LiteralValue),
   Ident(String),
-  BinaryOp(Box<Expr>, Op, Box<Expr>),
+  BinaryOp(BinaryOp),
   Call(String, Vec<Expr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct BinaryOp(pub Box<Expr>, pub Op, pub Box<Expr>);
+
+#[derive(Debug, Clone)]
 pub enum Op {
   Add,
   Sub,

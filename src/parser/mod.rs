@@ -1,7 +1,7 @@
 use std::cell::{Ref, RefCell};
 use crate::Token;
 use framework::{alt, delimited, many, map, opt, preceded, seperated_list, terminated, Choice, Parser as ParserTrait};
-use ast::{Expr, ExprKind, Program, Stmt, Type, LiteralValue};
+use ast::{BinaryOp, Expr, ExprKind, LiteralValue, Program, Stmt, Type};
 
 pub mod ast;
 mod framework;
@@ -26,6 +26,7 @@ impl<'a> Parser<'a> {
       Self::parse_assign_stmt,
       Self::parse_ret_stmt,
       Self::parse_func_decl,
+      map(terminated(Self::parse_expr, Token::Semi), |expr| Stmt::Expr(expr)),
     ))(tokens)?;
 
     Ok((stmt, tokens))
@@ -71,7 +72,7 @@ impl<'a> Parser<'a> {
       (None, tokens)
     };
 
-    Ok((Stmt::If(cond, Box::new(then_block), Box::new(else_block)), tokens))
+    Ok((Stmt::If(cond, Box::new(then_block), else_block.map(Box::new)), tokens))
   }
 
   fn parse_loop_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), String> {
@@ -205,7 +206,7 @@ impl<'a> Parser<'a> {
             if top_info.prec >= op_info.prec {
               let lhs = output.pop().unwrap(); // TODO: handle unwrap
               let rhs = output.pop().unwrap();
-              output.push(Expr(ExprKind::BinaryOp(Box::new(lhs), top_op.into(), Box::new(rhs)), RefCell::new(None)));
+              output.push(Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), top_op.into(), Box::new(rhs))), RefCell::new(None)));
               op_stack.push(token);
             } else {
               break;
@@ -217,13 +218,11 @@ impl<'a> Parser<'a> {
       }
       tokens = &tokens[1..];
     }
-
-    println!("output: {:?}", output);
   
     while let Some(op) = op_stack.pop() {
       let lhs = output.pop().unwrap();
       let rhs = output.pop().unwrap();
-      output.push(Expr(ExprKind::BinaryOp(Box::new(lhs), op.into(), Box::new(rhs)), RefCell::new(None)));
+      output.push(Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), op.into(), Box::new(rhs))), RefCell::new(None)));
     }
   
     if output.len() == 1 {

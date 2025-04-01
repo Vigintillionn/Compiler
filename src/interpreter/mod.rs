@@ -1,3 +1,4 @@
+use core::panic;
 use std::{collections::HashMap, fmt, rc::Rc};
 use crate::parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type};
 
@@ -176,7 +177,8 @@ impl Eval for Stmt {
         Value::Void
       },
       Expr(expr) => expr.eval(env),
-      _ => unimplemented!(),
+      Ret(expr) => expr.map_or(Value::Void, |expr| expr.eval(env)),
+      _ => panic!("{:?} unimplemented", self),
     }
   }
 }
@@ -192,7 +194,15 @@ impl Eval for Expr {
         let func = env.get(&name).unwrap_or_else(|err| panic!("{}", err)); // TODO: handle error
         match func {
           Value::Function(params, _, body) => {
-            unimplemented!()
+            env.enter_scope();
+            for (param, arg) in params.iter().zip(args) {
+              let val = arg.eval(env);
+              env.define(param.0.clone(), val);
+            }
+
+            let res = body.eval(env);
+            env.exit_scope().unwrap();
+            res
           },
           Value::NativeFunction(func) => func.0(
             args.into_iter()

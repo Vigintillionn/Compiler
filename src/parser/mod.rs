@@ -188,10 +188,11 @@ impl<'a> Parser<'a> {
         Token::Identifier(name) => {
           if tokens.len() > 1 && tokens[1] == Token::OpenParen {
             tokens = &tokens[1..];
+            // Parse function call arguments
             let (args, rest) = delimited(Token::OpenParen, seperated_list(Self::parse_expr, Token::Comma), Token::CloseParen)(tokens)?;
             output.push(Expr(ExprKind::Call(name.clone(), args), RefCell::new(None)));
             tokens = rest;
-            break;
+            continue;
           } else {
             output.push(Expr(ExprKind::Ident(name.clone()), RefCell::new(None)))
           }
@@ -204,8 +205,8 @@ impl<'a> Parser<'a> {
           while let Some(&top_op) = op_stack.last() {
             let top_info = top_op.op_info().expect("Token at top of stack is not an operator");
             if top_info.prec >= op_info.prec {
-              let lhs = output.pop().unwrap(); // TODO: handle unwrap
               let rhs = output.pop().unwrap();
+              let lhs = output.pop().unwrap(); // TODO: handle unwrap
               output.push(Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), top_op.into(), Box::new(rhs))), RefCell::new(None)));
               op_stack.push(token);
             } else {
@@ -220,8 +221,8 @@ impl<'a> Parser<'a> {
     }
   
     while let Some(op) = op_stack.pop() {
-      let lhs = output.pop().unwrap();
       let rhs = output.pop().unwrap();
+      let lhs = output.pop().unwrap();
       output.push(Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), op.into(), Box::new(rhs))), RefCell::new(None)));
     }
   

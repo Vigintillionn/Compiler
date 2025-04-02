@@ -114,6 +114,20 @@ impl<'a> Lexer<'a> {
       '*' => (Token::Asterisk, 1),
       '/' => (Token::Slash, 1),
       '=' | '!' | '<' | '>' => self.tokenize_cmp()?,
+      '&' => {
+        if self.src.chars().nth(1) == Some('&') {
+          (Token::And, 2)
+        } else {
+          return Err(LexerError::InvalidCharacter(next, self.pos));
+        }
+      },
+      '|' => {
+        if self.src.chars().nth(1) == Some('|') {
+          (Token::Or, 2)
+        } else {
+          return Err(LexerError::InvalidCharacter(next, self.pos));
+        }
+      },
       '0'..='9' => self.tokenize_number()?,
       c if c.is_alphanumeric() || c == '_' => self.tokenize_ident()?,
       _ => return Err(LexerError::InvalidCharacter(next, self.pos))

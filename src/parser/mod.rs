@@ -1,7 +1,7 @@
 use std::cell::{Ref, RefCell};
 use crate::Token;
 use framework::{alt, delimited, many, map, opt, preceded, seperated_list, terminated, Choice, Parser as ParserTrait};
-use ast::{BinaryOp, Expr, ExprKind, LiteralValue, Program, Stmt, Type};
+use ast::{BinaryOp, Expr, ExprKind, LiteralValue, Program, Stmt, Type, UnaryOp};
 
 pub mod ast;
 mod framework;
@@ -202,18 +202,35 @@ impl<'a> Parser<'a> {
         Token::BoolLiteral(b) => output.push(Expr(ExprKind::Literal(LiteralValue::Boolean(*b)), RefCell::new(Some(Type::Boolean)))), // TODO: Handle typing
         _ if token.op_info().is_some() => {
           let op_info = token.op_info().expect("Token op_info is None"); // token.op_info() is not None
-          while let Some(&top_op) = op_stack.last() {
-            let top_info = top_op.op_info().expect("Token at top of stack is not an operator");
-            if top_info.prec >= op_info.prec {
-              let rhs = output.pop().unwrap();
-              let lhs = output.pop().unwrap(); // TODO: handle unwrap
-              output.push(Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), top_op.into(), Box::new(rhs))), RefCell::new(None)));
-              op_stack.push(token);
-            } else {
-              break;
+          if op_info.is_unary {
+            op_stack.push(token);
+          } else {
+            // First, apply any pending unary operators
+            while let Some(&top_op) = op_stack.last() {
+              let top_info = top_op.op_info().expect("Token at top of stack is not an operator");
+              if top_info.is_unary {
+                op_stack.pop();
+                let operand = output.pop().expect("No operand for unary operator");
+                output.push(Expr(ExprKind::UnaryOp(UnaryOp(top_op.into(), Box::new(operand))), RefCell::new(None)));
+              } else {
+                break;
+              }
             }
+
+            // Next, apply any pending binary operators
+            while let Some(&top_op) = op_stack.last() {
+              let top_info = top_op.op_info().expect("Token at top of stack is not an operator");
+              if top_info.prec >= op_info.prec {
+                let rhs = output.pop().unwrap();
+                let lhs = output.pop().unwrap(); // TODO: handle unwrap
+                output.push(Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), top_op.into(), Box::new(rhs))), RefCell::new(None)));
+                op_stack.push(token);
+              } else {
+                break;
+              }
+            }
+            op_stack.push(token);
           }
-          op_stack.push(token);
         },
         _ => break
       }
@@ -221,9 +238,16 @@ impl<'a> Parser<'a> {
     }
   
     while let Some(op) = op_stack.pop() {
-      let rhs = output.pop().unwrap();
-      let lhs = output.pop().unwrap();
-      output.push(Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), op.into(), Box::new(rhs))), RefCell::new(None)));
+      let expr = if op.op_info().unwrap().is_unary {
+        let operand = output.pop().unwrap();
+        Expr(ExprKind::UnaryOp(UnaryOp(op.into(), Box::new(operand))), RefCell::new(None))
+      } else {
+        let rhs = output.pop().unwrap();
+        let lhs = output.pop().unwrap();
+        Expr(ExprKind::BinaryOp(BinaryOp(Box::new(lhs), op.into(), Box::new(rhs))), RefCell::new(None))
+      };
+
+      output.push(expr);
     }
   
     if output.len() == 1 {

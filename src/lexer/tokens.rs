@@ -68,6 +68,8 @@ pub enum Token {
   CloseBrace,   // }
   Comma,        // ,
   Arrow,        // ->
+  And,          // &&
+  Or,           // ||
 }
 
 pub enum Assoc {
@@ -78,14 +80,17 @@ pub enum Assoc {
 pub struct OpInfo {
   pub prec: u8,
   pub assoc: Assoc,
+  pub is_unary: bool,
 }
 
 impl Token {
   pub fn op_info(&self) -> Option<OpInfo> {
     match self {
-      Token::Plus | Token::Minus => Some(OpInfo { prec: 2, assoc: Assoc::Left }),
-      Token::Asterisk | Token::Slash => Some(OpInfo { prec: 3, assoc: Assoc::Left }),
-      Token::Eq | Token::NotEq | Token::LThan | Token::GThan | Token::LThanEq | Token::GThanEq => Some(OpInfo { prec: 1, assoc: Assoc::Left }),
+      Token::Plus | Token::Minus => Some(OpInfo { prec: 2, assoc: Assoc::Left, is_unary: false }),
+      Token::Asterisk | Token::Slash => Some(OpInfo { prec: 3, assoc: Assoc::Left, is_unary: false }),
+      Token::Eq | Token::NotEq | Token::LThan | Token::GThan | Token::LThanEq | Token::GThanEq => Some(OpInfo { prec: 1, assoc: Assoc::Left, is_unary: false }),
+      Token::And | Token::Or => Some(OpInfo { prec: 0, assoc: Assoc::Left, is_unary: false }),
+      Token::Bang => Some(OpInfo { prec: 4, assoc: Assoc::Right, is_unary: true }),
       _ => None,
     }
   }

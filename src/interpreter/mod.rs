@@ -1,6 +1,6 @@
 use core::panic;
 use std::{collections::HashMap, fmt, rc::Rc};
-use crate::parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type};
+use crate::parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type, UnaryOp};
 
 pub enum EvalResult {
   Value(Value),
@@ -246,14 +246,13 @@ impl Eval for Expr {
       Literal(value) => value.eval(env),
       Ident(name) => EvalResult::Value(env.get(&name).unwrap_or_else(|err| panic!("{}", err))), // TODO: handle error
       BinaryOp(bin) => bin.eval(env),
+      UnaryOp(un) => un.eval(env),
       Call(name, args) => {
         let func = env.get(&name).unwrap_or_else(|err| panic!("{}", err)); // TODO: handle error
         match func {
           Value::Function(params, _, body) => {
             env.enter_scope();
             for (param, arg) in params.iter().zip(args) {
-              // let val = arg.eval(env);
-              // env.define(param.0.clone(), val);
               let val = arg.eval(env).into_value();
               env.define(param.0.clone(), val);
             }
@@ -309,6 +308,23 @@ impl Eval for BinaryOp {
       Op::Lt => Value::Boolean(lhs < rhs),
       Op::Lte => Value::Boolean(lhs <= rhs),
 
+      Op::And => Value::Boolean(lhs.is_truthy() && rhs.is_truthy()),
+      Op::Or => Value::Boolean(lhs.is_truthy() || rhs.is_truthy()),
+
+      _ => panic!("This is not a valid binary operator!"),
+    };
+
+    EvalResult::Value(res)
+  }
+}
+
+impl Eval for UnaryOp {
+  fn eval(self, env: &mut Environment) -> EvalResult {
+    let Self(op, expr) = self;
+    let val = expr.eval(env).into_value();
+
+    let res = match op {
+      Op::Not => Value::Boolean(!val.is_truthy()),
       _ => unimplemented!(),
     };
 

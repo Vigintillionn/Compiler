@@ -45,11 +45,14 @@ pub enum ExprKind {
   Literal(LiteralValue),
   Ident(String),
   BinaryOp(BinaryOp),
+  UnaryOp(UnaryOp),
   Call(String, Vec<Expr>),
 }
 
 #[derive(Debug, Clone)]
 pub struct BinaryOp(pub Box<Expr>, pub Op, pub Box<Expr>);
+#[derive(Debug, Clone)]
+pub struct UnaryOp(pub Op, pub Box<Expr>);
 
 #[derive(Debug, Clone)]
 pub enum Op {
@@ -83,7 +86,10 @@ impl From<&Token> for Op {
       Token::LThanEq => Self::Lte,
       Token::GThan => Self::Gt,
       Token::GThanEq => Self::Gte,
-      _ => panic!("This is not a valid operator!")
+      Token::And => Self::And,
+      Token::Or => Self::Or,
+      Token::Bang => Self::Not,
+      _ => panic!("This is not a valid operator! {:?}", tok),
     }
   }
 }

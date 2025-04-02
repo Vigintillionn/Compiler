@@ -57,6 +57,17 @@ pub enum Op {
   Sub,
   Mul,
   Div,
+
+  Eq,
+  Neq,
+  Lt,
+  Lte,
+  Gt,
+  Gte,
+
+  And,
+  Or,
+  Not,
 }
 
 impl From<&Token> for Op {
@@ -66,6 +77,12 @@ impl From<&Token> for Op {
       Token::Minus => Self::Sub,
       Token::Asterisk => Self::Mul,
       Token::Slash => Self::Div,
+      Token::Eq => Self::Eq,
+      Token::NotEq => Self::Neq,
+      Token::LThan => Self::Lt,
+      Token::LThanEq => Self::Lte,
+      Token::GThan => Self::Gt,
+      Token::GThanEq => Self::Gte,
       _ => panic!("This is not a valid operator!")
     }
   }

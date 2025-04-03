@@ -275,8 +275,6 @@ impl Eval for Stmt {
           }
         }
 
-        println!("Loop result: {:?}", result);
-
         result
       },
       Break => EvalValue::Break,

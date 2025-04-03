@@ -257,12 +257,10 @@ impl Eval for Stmt {
           if let Stmt::Block(ref block) = *block {
             for stmt in block.clone() {
               result = stmt.eval(env);
-              if let EvalValue::Return(_) = result {
+              if matches!(result, EvalValue::Return(_) | EvalValue::Break) {
                 break 'outer;
               }
-              if let EvalValue::Break = result {
-                break 'outer;
-              }
+
               if let EvalValue::Continue = result {
                 if let Some(incr) = incr.clone() {
                   incr.eval(env);

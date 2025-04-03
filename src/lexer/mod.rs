@@ -6,11 +6,13 @@ use crate::{LexerResult, LexerError};
 struct Lexer<'a> {
   src: &'a str,
   pos: usize,
+  line: usize,
+  col: usize,
 }
 
 impl<'a> Lexer<'a> {
   pub fn new(src: &'a str) -> Self {
-    Lexer { src, pos: 0 }
+    Lexer { src, pos: 0, line: 1, col: 1 }
   }
 
   fn take_while<F>(&mut self, mut pred: F) -> (&'a str, usize)
@@ -89,11 +91,11 @@ impl<'a> Lexer<'a> {
       }
     }
 
-    Err(LexerError::InvalidCharacter(cmp, self.pos))
+    Err(LexerError::InvalidCharacter(cmp, self.line, self.col, self.pos))
   }
 
   fn tokenize_single_token(&mut self) -> LexerResult<(Token, usize)> {
-    let next = self.src.chars().next().ok_or(LexerError::UnexpectedEOF)?;
+    let next = self.src.chars().next().ok_or(LexerError::UnexpectedEOF(self.line, self.col))?;
 
     let (tok, bytes) = match next {
       '(' => (Token::OpenParen, 1),
@@ -118,19 +120,19 @@ impl<'a> Lexer<'a> {
         if self.src.chars().nth(1) == Some('&') {
           (Token::And, 2)
         } else {
-          return Err(LexerError::InvalidCharacter(next, self.pos));
+          return Err(LexerError::InvalidCharacter(next, self.line, self.col, self.pos));
         }
       },
       '|' => {
         if self.src.chars().nth(1) == Some('|') {
           (Token::Or, 2)
         } else {
-          return Err(LexerError::InvalidCharacter(next, self.pos));
+          return Err(LexerError::InvalidCharacter(next, self.line, self.col, self.pos));
         }
       },
       '0'..='9' => self.tokenize_number()?,
       c if c.is_alphanumeric() || c == '_' => self.tokenize_ident()?,
-      _ => return Err(LexerError::InvalidCharacter(next, self.pos))
+      _ => return Err(LexerError::InvalidCharacter(next, self.line, self.col, self.pos))
     };
 
     Ok((tok, bytes))
@@ -140,11 +142,11 @@ impl<'a> Lexer<'a> {
     let (num, bytes) = self.take_while(|c| c.is_digit(10) || c == '.');
     if num.contains('.') {
       let num = num.parse::<f64>()
-        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.pos))?;
+        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.line, self.col, self.pos))?;
       Ok((Token::FloatLiteral(num), bytes))
     } else {
       let num = num.parse::<i64>()
-        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.pos))?;
+        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.line, self.col, self.pos))?;
       Ok((Token::IntLiteral(num), bytes))
     }
   }
@@ -161,6 +163,16 @@ impl<'a> Lexer<'a> {
   }
 
   fn chomp(&mut self, bytes: usize) {
+    let chunk = &self.src[..bytes];
+    for c in chunk.chars() {
+      if c == '\n' {
+        self.line += 1;
+        self.col = 1;
+      } else {
+        self.col += c.len_utf8();
+      }
+    }
+
     self.src = &self.src[bytes..];
     self.pos += bytes;
   }
@@ -177,7 +189,10 @@ impl Iterator for Lexer<'_> {
 
     let (tok, bytes) = match self.tokenize_single_token() {
       Ok((tok, bytes)) => (tok, bytes),
-      Err(e) => return Some(Err(e))
+      Err(e) => {
+        self.chomp(1);
+        return Some(Err(e))
+      }
     };
 
     self.chomp(bytes);
@@ -185,7 +200,7 @@ impl Iterator for Lexer<'_> {
   }
 }
 
-pub fn tokenize(src: &str) -> LexerResult<Vec<Token>> {
+pub fn tokenize(src: &str) -> Result<Vec<Token>, Vec<LexerError>> {
   // let lexer = Lexer::new(src);
   // let mut tokens = Vec::new();
 
@@ -193,10 +208,23 @@ pub fn tokenize(src: &str) -> LexerResult<Vec<Token>> {
   //   tokens.push(token?);
   // }
 
-  let tokens = Lexer::new(src)
-    .collect::<Result<Vec<Token>, LexerError>>()?;
+  let mut lexer = Lexer::new(src);
+  let mut tokens = Vec::new();
+  let mut errors = Vec::new();
 
-  Ok(tokens)
+  while let Some(token) = lexer.next() {
+    println!("tokenizeing");
+    match token {
+      Ok(tok) => tokens.push(tok),
+      Err(e) => errors.push(e)
+    }
+  }
+
+  if errors.is_empty() {
+    Ok(tokens)
+  } else {
+    Err(errors)
+  }
 }
 
 

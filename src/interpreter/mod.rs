@@ -2,6 +2,7 @@ use core::panic;
 use std::{collections::HashMap, fmt, rc::Rc};
 use crate::parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type, UnaryOp};
 
+#[derive(Debug, Clone)]
 pub enum EvalValue {
   Value(Value),
   Return(Value),
@@ -244,29 +245,29 @@ impl Eval for Stmt {
           init.eval(env);
         }
 
-        loop {
+        let mut result = EvalValue::Value(Value::Void);
+        'outer: loop {
           let cond = cond.as_ref().map(|c| c.clone().eval(env).into_value());
           if let Some(cond) = cond {
             if !cond.is_truthy() {
               break;
             }
           }
-
+          
           if let Stmt::Block(ref block) = *block {
-            let mut result = EvalValue::Value(Value::Void);
             for stmt in block.clone() {
               result = stmt.eval(env);
               if let EvalValue::Return(_) = result {
-                break;
+                break 'outer;
               }
               if let EvalValue::Break = result {
-                break;
+                break 'outer;
               }
               if let EvalValue::Continue = result {
                 if let Some(incr) = incr.clone() {
                   incr.eval(env);
                 }
-                continue;
+                continue 'outer;
               }
             }
           }
@@ -276,7 +277,9 @@ impl Eval for Stmt {
           }
         }
 
-        EvalValue::Value(Value::Void)
+        println!("Loop result: {:?}", result);
+
+        result
       },
       Break => EvalValue::Break,
       Continue => EvalValue::Continue,

@@ -201,19 +201,11 @@ impl Iterator for Lexer<'_> {
 }
 
 pub fn tokenize(src: &str) -> Result<Vec<Token>, Vec<LexerError>> {
-  // let lexer = Lexer::new(src);
-  // let mut tokens = Vec::new();
-
-  // for token in lexer {
-  //   tokens.push(token?);
-  // }
-
   let mut lexer = Lexer::new(src);
   let mut tokens = Vec::new();
   let mut errors = Vec::new();
 
   while let Some(token) = lexer.next() {
-    println!("tokenizeing");
     match token {
       Ok(tok) => tokens.push(tok),
       Err(e) => errors.push(e)

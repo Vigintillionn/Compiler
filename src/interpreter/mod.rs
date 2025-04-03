@@ -2,16 +2,18 @@ use core::panic;
 use std::{collections::HashMap, fmt, rc::Rc};
 use crate::parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type, UnaryOp};
 
-pub enum EvalResult {
+pub enum EvalValue {
   Value(Value),
   Return(Value),
+  Break,
   // TODO: maybe add break and continue
 }
 
-impl EvalResult {
+impl EvalValue {
   fn into_value(self) -> Value {
     match self {
-      EvalResult::Value(v) | EvalResult::Return(v) => v,
+      EvalValue::Value(v) | EvalValue::Return(v) => v,
+      EvalValue::Break => panic!("Cannot convert break to value"),
     }
   }
 }
@@ -175,25 +177,28 @@ impl Environment {
 }
 
 pub trait Eval {
-  fn eval(self, env: &mut Environment) -> EvalResult;
+  fn eval(self, env: &mut Environment) -> EvalValue;
 }
 
 impl Eval for Program {
-  fn eval(self, env: &mut Environment) -> EvalResult {
-    self.0.into_iter().map(|stmt| stmt.eval(env)).last().unwrap_or(EvalResult::Value(Value::Void))
+  fn eval(self, env: &mut Environment) -> EvalValue {
+    self.0.into_iter().map(|stmt| stmt.eval(env)).last().unwrap_or(EvalValue::Value(Value::Void))
   }
 }
 
 impl Eval for Stmt {
-  fn eval(self, env: &mut Environment) -> EvalResult {
+  fn eval(self, env: &mut Environment) -> EvalValue {
     use Stmt::*;
     match self {
       Block(stmts) => {
         env.enter_scope();
-        let mut result = EvalResult::Value(Value::Void);
+        let mut result = EvalValue::Value(Value::Void);
         for stmt in stmts {
           result = stmt.eval(env);
-          if let EvalResult::Return(_) = result {
+          if let EvalValue::Return(_) = result {
+            break;
+          }
+          if let EvalValue::Break = result {
             break;
           }
         }
@@ -203,12 +208,12 @@ impl Eval for Stmt {
       Var(name, expr, _) => {
         let val = expr.eval(env).into_value();
         env.define(name, val);
-        EvalResult::Value(Value::Void)
+        EvalValue::Value(Value::Void)
       },
       Assign(name, expr) => {
         let val = expr.eval(env).into_value();
         env.assign(&name, val).unwrap_or_else(|err| panic!("{}", err)); // TODO: handle error
-        EvalResult::Value(Value::Void)
+        EvalValue::Value(Value::Void)
       },
       If(cond, then_block, else_block) => {
         let cond = cond.eval(env).into_value();
@@ -217,22 +222,52 @@ impl Eval for Stmt {
         } else if let Some(else_block) = else_block {
           else_block.eval(env)
         } else {
-          EvalResult::Value(Value::Void)
+          EvalValue::Value(Value::Void)
         }
       },
       Function(name, args, ret, body) => {
         env.define(name, Value::Function(args, ret, *body));
-        EvalResult::Value(Value::Void)
+        EvalValue::Value(Value::Void)
       },
       Expr(expr) => expr.eval(env),
       Ret(expr) =>{
         //  expr.map_or(Value::Void, |expr| expr.eval(env))
         let val = expr.map_or(Value::Void, |expr| {
           match expr.eval(env) {
-            EvalResult::Return(v) | EvalResult::Value(v) => v,
+            EvalValue::Return(v) | EvalValue::Value(v) => v,
+            _ => panic!("Invalid return value"),
           }
         });
-        EvalResult::Return(val)
+        EvalValue::Return(val)
+      },
+      Loop(init, cond, incr, block) => {
+        env.enter_scope();
+        if let Some(init) = init {
+          init.eval(env);
+        }
+
+        loop {
+          let cond = cond.as_ref().map(|c| c.clone().eval(env).into_value());
+          if let Some(cond) = cond {
+            if !cond.is_truthy() {
+              break;
+            }
+          }
+
+          let res = block.clone().eval(env);
+          if let EvalValue::Return(_) = res {
+            break;
+          }
+
+          if let Some(incr) = incr.clone() {
+            incr.eval(env);
+          }
+        }
+
+        EvalValue::Value(Value::Void)
+      },
+      Break => {
+        EvalValue::Break
       },
       _ => panic!("{:?} unimplemented", self),
     }
@@ -240,11 +275,11 @@ impl Eval for Stmt {
 }
 
 impl Eval for Expr {
-  fn eval(self, env: &mut Environment) -> EvalResult {
+  fn eval(self, env: &mut Environment) -> EvalValue {
     use ExprKind::*;
     match self.0 {
       Literal(value) => value.eval(env),
-      Ident(name) => EvalResult::Value(env.get(&name).unwrap_or_else(|err| panic!("{}", err))), // TODO: handle error
+      Ident(name) => EvalValue::Value(env.get(&name).unwrap_or_else(|err| panic!("{}", err))), // TODO: handle error
       BinaryOp(bin) => bin.eval(env),
       UnaryOp(un) => un.eval(env),
       Call(name, args) => {
@@ -259,9 +294,9 @@ impl Eval for Expr {
 
             let res = body.eval(env);
             env.exit_scope().unwrap();
-            EvalResult::Value(res.into_value())
+            EvalValue::Value(res.into_value())
           },
-          Value::NativeFunction(func) => EvalResult::Value(func.0(
+          Value::NativeFunction(func) => EvalValue::Value(func.0(
             args.into_iter()
               .map(|arg| arg.eval(env).into_value())
               .collect())
@@ -274,7 +309,7 @@ impl Eval for Expr {
 }
 
 impl Eval for BinaryOp {
-  fn eval(self, env: &mut Environment) -> EvalResult {
+  fn eval(self, env: &mut Environment) -> EvalValue {
     let Self (lhs, op, rhs) = self;
     let lhs = lhs.eval(env).into_value();
     let rhs = rhs.eval(env).into_value();
@@ -314,12 +349,12 @@ impl Eval for BinaryOp {
       _ => panic!("This is not a valid binary operator!"),
     };
 
-    EvalResult::Value(res)
+    EvalValue::Value(res)
   }
 }
 
 impl Eval for UnaryOp {
-  fn eval(self, env: &mut Environment) -> EvalResult {
+  fn eval(self, env: &mut Environment) -> EvalValue {
     let Self(op, expr) = self;
     let val = expr.eval(env).into_value();
 
@@ -328,12 +363,12 @@ impl Eval for UnaryOp {
       _ => unimplemented!(),
     };
 
-    EvalResult::Value(res)
+    EvalValue::Value(res)
   }
 }
 
 impl Eval for LiteralValue {
-  fn eval(self, _: &mut Environment) -> EvalResult {
+  fn eval(self, _: &mut Environment) -> EvalValue {
     use LiteralValue::*;
     let v = match self {
       Integer(value) => Value::Int(value),
@@ -342,6 +377,6 @@ impl Eval for LiteralValue {
       Boolean(value) => Value::Boolean(value),
     };
 
-    EvalResult::Value(v)
+    EvalValue::Value(v)
   }
 }

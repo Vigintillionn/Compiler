@@ -14,6 +14,7 @@ mod keywords {
     "for" => For,
     "while" => While,
     "loop" => Loop,
+    "break" => Break,
   };
 }
 
@@ -38,6 +39,7 @@ pub enum Token {
   Var,
   Ret,
   Proc,
+  Break,
 
   /* Types */
   Int,

@@ -27,6 +27,7 @@ pub enum Stmt {
   Ret(Option<Expr>),
   Function(String, Vec<(String, Type)>, Type, Box<Stmt>),
   Expr(Expr),
+  Break,
 }
 
 #[derive(Debug, Clone)]

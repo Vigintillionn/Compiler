@@ -27,6 +27,7 @@ impl<'a> Parser<'a> {
       Self::parse_ret_stmt,
       Self::parse_func_decl,
       map(terminated(Token::Break, Token::Semi), |_| Stmt::Break),
+      map(terminated(Token::Continue, Token::Semi), |_| Stmt::Continue),
       map(terminated(Self::parse_expr, Token::Semi), |expr| Stmt::Expr(expr)),
     ))(tokens)?;
 

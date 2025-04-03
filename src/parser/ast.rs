@@ -28,6 +28,7 @@ pub enum Stmt {
   Function(String, Vec<(String, Type)>, Type, Box<Stmt>),
   Expr(Expr),
   Break,
+  Continue,
 }
 
 #[derive(Debug, Clone)]

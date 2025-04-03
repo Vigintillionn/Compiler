@@ -6,6 +6,7 @@ pub enum EvalValue {
   Value(Value),
   Return(Value),
   Break,
+  Continue
   // TODO: maybe add break and continue
 }
 
@@ -13,7 +14,7 @@ impl EvalValue {
   fn into_value(self) -> Value {
     match self {
       EvalValue::Value(v) | EvalValue::Return(v) => v,
-      EvalValue::Break => panic!("Cannot convert break to value"),
+      EvalValue::Break | EvalValue::Continue => panic!("Cannot convert break to value"),
     }
   }
 }
@@ -198,9 +199,6 @@ impl Eval for Stmt {
           if let EvalValue::Return(_) = result {
             break;
           }
-          if let EvalValue::Break = result {
-            break;
-          }
         }
         env.exit_scope().unwrap();
         result
@@ -254,9 +252,23 @@ impl Eval for Stmt {
             }
           }
 
-          let res = block.clone().eval(env);
-          if let EvalValue::Return(_) = res {
-            break;
+          if let Stmt::Block(ref block) = *block {
+            let mut result = EvalValue::Value(Value::Void);
+            for stmt in block.clone() {
+              result = stmt.eval(env);
+              if let EvalValue::Return(_) = result {
+                break;
+              }
+              if let EvalValue::Break = result {
+                break;
+              }
+              if let EvalValue::Continue = result {
+                if let Some(incr) = incr.clone() {
+                  incr.eval(env);
+                }
+                continue;
+              }
+            }
           }
 
           if let Some(incr) = incr.clone() {
@@ -266,9 +278,8 @@ impl Eval for Stmt {
 
         EvalValue::Value(Value::Void)
       },
-      Break => {
-        EvalValue::Break
-      },
+      Break => EvalValue::Break,
+      Continue => EvalValue::Continue,
       _ => panic!("{:?} unimplemented", self),
     }
   }

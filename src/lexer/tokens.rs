@@ -1,6 +1,6 @@
 mod keywords {
-  use super::Token::*;
-  pub const KEYWORDS: phf::Map<&'static str, super::Token> = phf::phf_map! {
+  use super::TokenKind::*;
+  pub const KEYWORDS: phf::Map<&'static str, super::TokenKind> = phf::phf_map! {
     "proc" => Proc,
     "var" => Var,
     "if" => If,
@@ -21,8 +21,16 @@ mod keywords {
 
 pub use keywords::KEYWORDS;
 
+#[derive(Debug, Clone)]
+pub struct Token {
+  pub kind: TokenKind,
+  pub line: usize,
+  pub col: usize,
+  pub pos: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
-pub enum Token {
+pub enum TokenKind {
   Identifier(String),
   
   /* Literals */
@@ -87,15 +95,33 @@ pub struct OpInfo {
   pub is_unary: bool,
 }
 
-impl Token {
+impl TokenKind {
   pub fn op_info(&self) -> Option<OpInfo> {
+    use TokenKind::*;
     match self {
-      Token::Plus | Token::Minus => Some(OpInfo { prec: 2, assoc: Assoc::Left, is_unary: false }),
-      Token::Asterisk | Token::Slash => Some(OpInfo { prec: 3, assoc: Assoc::Left, is_unary: false }),
-      Token::Eq | Token::NotEq | Token::LThan | Token::GThan | Token::LThanEq | Token::GThanEq => Some(OpInfo { prec: 1, assoc: Assoc::Left, is_unary: false }),
-      Token::And | Token::Or => Some(OpInfo { prec: 0, assoc: Assoc::Left, is_unary: false }),
-      Token::Bang => Some(OpInfo { prec: 4, assoc: Assoc::Right, is_unary: true }),
+      Plus | Minus => Some(OpInfo { prec: 2, assoc: Assoc::Left, is_unary: false }),
+      Asterisk | Slash => Some(OpInfo { prec: 3, assoc: Assoc::Left, is_unary: false }),
+      Eq | NotEq | LThan | GThan | LThanEq | GThanEq => Some(OpInfo { prec: 1, assoc: Assoc::Left, is_unary: false }),
+      And | Or => Some(OpInfo { prec: 0, assoc: Assoc::Left, is_unary: false }),
+      Bang => Some(OpInfo { prec: 4, assoc: Assoc::Right, is_unary: true }),
       _ => None,
+    }
+  }
+
+  pub fn len(&self) -> usize {
+    use TokenKind::*;
+    match self {
+      Plus | Minus | Asterisk | Slash | Assign | Bang | Eq | LThan | GThan
+      | Semi | Colon | OpenParen | CloseParen | OpenBrace | CloseBrace | Comma => 1,
+      Arrow | And | Or | If | NotEq | LThanEq | GThanEq => 2,
+      For | Var | Ret | Int | Str => 3,
+      Loop | Else | Proc | Bool => 4,
+      While | Break | Float => 5,
+      Continue => 8,
+      Identifier(s) | StringLiteral(s) => s.len(),
+      IntLiteral(s) => s.to_string().len(),
+      FloatLiteral(s) => s.to_string().len(),
+      BoolLiteral(s) => s.to_string().len(),
     }
   }
 }

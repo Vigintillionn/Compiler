@@ -1,7 +1,7 @@
 pub mod tokens;
-use tokens::{Token, KEYWORDS};
+use tokens::{Token, TokenKind, KEYWORDS};
 
-use crate::{LexerResult, LexerError};
+use crate::{errors::Location, errors::lexer::{LexerError, LexerResult}};
 
 struct Lexer<'a> {
   src: &'a str,
@@ -13,6 +13,14 @@ struct Lexer<'a> {
 impl<'a> Lexer<'a> {
   pub fn new(src: &'a str) -> Self {
     Lexer { src, pos: 0, line: 1, col: 1 }
+  }
+
+  fn get_loc(&self) -> Location {
+    Location {
+      line: self.line,
+      col: self.col,
+      pos: self.pos
+    }
   }
 
   fn take_while<F>(&mut self, mut pred: F) -> (&'a str, usize)
@@ -72,13 +80,13 @@ impl<'a> Lexer<'a> {
     }
   }
 
-  fn tokenize_cmp(&mut self) -> LexerResult<(Token, usize)> {
+  fn tokenize_cmp(&mut self) -> LexerResult<(TokenKind, usize)> {
     let cmp = self.src.chars().next().unwrap();
     let tokens = [
-      ('=', Token::Assign, Token::Eq),
-      ('!', Token::Bang, Token::NotEq),
-      ('<', Token::LThan, Token::LThanEq),
-      ('>', Token::GThan, Token::GThanEq)
+      ('=', TokenKind::Assign, TokenKind::Eq),
+      ('!', TokenKind::Bang, TokenKind::NotEq),
+      ('<', TokenKind::LThan, TokenKind::LThanEq),
+      ('>', TokenKind::GThan, TokenKind::GThanEq)
     ];
 
     for (pat, tok1, tok2) in tokens.iter() {
@@ -91,73 +99,73 @@ impl<'a> Lexer<'a> {
       }
     }
 
-    Err(LexerError::InvalidCharacter(cmp, self.line, self.col, self.pos))
+    Err(LexerError::InvalidCharacter(self.get_loc(), cmp))
   }
 
   fn tokenize_single_token(&mut self) -> LexerResult<(Token, usize)> {
-    let next = self.src.chars().next().ok_or(LexerError::UnexpectedEOF(self.line, self.col))?;
+    let next = self.src.chars().next().ok_or(LexerError::UnexpectedEOF(self.get_loc()))?;
 
     let (tok, bytes) = match next {
-      '(' => (Token::OpenParen, 1),
-      ')' => (Token::CloseParen, 1),
-      '{' => (Token::OpenBrace, 1),
-      '}' => (Token::CloseBrace, 1),
-      ';' => (Token::Semi, 1),
-      ':' => (Token::Colon, 1),
-      ',' => (Token::Comma, 1),
-      '+' => (Token::Plus, 1),
+      '(' => (TokenKind::OpenParen, 1),
+      ')' => (TokenKind::CloseParen, 1),
+      '{' => (TokenKind::OpenBrace, 1),
+      '}' => (TokenKind::CloseBrace, 1),
+      ';' => (TokenKind::Semi, 1),
+      ':' => (TokenKind::Colon, 1),
+      ',' => (TokenKind::Comma, 1),
+      '+' => (TokenKind::Plus, 1),
       '-' => {
         if self.src.chars().nth(1) == Some('>') {
-          (Token::Arrow, 2)
+          (TokenKind::Arrow, 2)
         } else {
-          (Token::Minus, 1)
+          (TokenKind::Minus, 1)
         }
       },
-      '*' => (Token::Asterisk, 1),
-      '/' => (Token::Slash, 1),
+      '*' => (TokenKind::Asterisk, 1),
+      '/' => (TokenKind::Slash, 1),
       '=' | '!' | '<' | '>' => self.tokenize_cmp()?,
       '&' => {
         if self.src.chars().nth(1) == Some('&') {
-          (Token::And, 2)
+          (TokenKind::And, 2)
         } else {
-          return Err(LexerError::InvalidCharacter(next, self.line, self.col, self.pos));
+          return Err(LexerError::InvalidCharacter(self.get_loc(), next));
         }
       },
       '|' => {
         if self.src.chars().nth(1) == Some('|') {
-          (Token::Or, 2)
+          (TokenKind::Or, 2)
         } else {
-          return Err(LexerError::InvalidCharacter(next, self.line, self.col, self.pos));
+          return Err(LexerError::InvalidCharacter(self.get_loc(), next));
         }
       },
       '0'..='9' => self.tokenize_number()?,
       c if c.is_alphanumeric() || c == '_' => self.tokenize_ident()?,
-      _ => return Err(LexerError::InvalidCharacter(next, self.line, self.col, self.pos))
+      _ => return Err(LexerError::InvalidCharacter(self.get_loc(), next))
     };
 
-    Ok((tok, bytes))
+    Ok((Token { kind: tok, line: self.line, col: self.col, pos: self.pos }, bytes))
   }
 
-  fn tokenize_number(&mut self) -> LexerResult<(Token, usize)> {
+  fn tokenize_number(&mut self) -> LexerResult<(TokenKind, usize)> {
     let (num, bytes) = self.take_while(|c| c.is_digit(10) || c == '.');
     if num.contains('.') {
       let num = num.parse::<f64>()
-        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.line, self.col, self.pos))?;
-      Ok((Token::FloatLiteral(num), bytes))
+        .map_err(|_| LexerError::InvalidNumber(self.get_loc(), num.to_string()))?;
+      Ok((TokenKind::FloatLiteral(num), bytes))
     } else {
       let num = num.parse::<i64>()
-        .map_err(|_| LexerError::InvalidNumber(num.to_string(), self.line, self.col, self.pos))?;
-      Ok((Token::IntLiteral(num), bytes))
+        .map_err(|_| LexerError::InvalidNumber(self.get_loc(), num.to_string()))?;
+      Ok((TokenKind::IntLiteral(num), bytes))
     }
   }
 
-  fn tokenize_ident(&mut self) -> LexerResult<(Token, usize)> {
+  fn tokenize_ident(&mut self) -> LexerResult<(TokenKind, usize)> {
     let (ident, bytes) = self.take_while(|c| c.is_alphanumeric() || c == '_');
 
     let tok = KEYWORDS
       .get(ident)
       .cloned()
-      .unwrap_or(Token::Identifier(ident.to_string()));
+      .unwrap_or(TokenKind::Identifier(ident.to_string()));
 
     Ok((tok, bytes))
   }

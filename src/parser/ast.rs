@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use crate::Token;
+use crate::{lexer::tokens::TokenKind, Token};
 
 type Block = Vec<Stmt>;
 
@@ -76,21 +76,28 @@ pub enum Op {
 }
 
 impl From<&Token> for Op {
-  fn from(tok: &Token) -> Self {
+  fn from(value: &Token) -> Self {
+    Self::from(&value.kind)
+  }
+}
+
+impl From<&TokenKind> for Op {
+  fn from(tok: &TokenKind) -> Self {
+    use TokenKind::*;
     match tok {
-      Token::Plus => Self::Add,
-      Token::Minus => Self::Sub,
-      Token::Asterisk => Self::Mul,
-      Token::Slash => Self::Div,
-      Token::Eq => Self::Eq,
-      Token::NotEq => Self::Neq,
-      Token::LThan => Self::Lt,
-      Token::LThanEq => Self::Lte,
-      Token::GThan => Self::Gt,
-      Token::GThanEq => Self::Gte,
-      Token::And => Self::And,
-      Token::Or => Self::Or,
-      Token::Bang => Self::Not,
+      Plus => Self::Add,
+      Minus => Self::Sub,
+      Asterisk => Self::Mul,
+      Slash => Self::Div,
+      Eq => Self::Eq,
+      NotEq => Self::Neq,
+      LThan => Self::Lt,
+      LThanEq => Self::Lte,
+      GThan => Self::Gt,
+      GThanEq => Self::Gte,
+      And => Self::And,
+      Or => Self::Or,
+      Bang => Self::Not,
       _ => panic!("This is not a valid operator! {:?}", tok),
     }
   }

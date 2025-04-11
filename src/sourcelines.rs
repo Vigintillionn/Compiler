@@ -14,6 +14,10 @@ impl SourceLines {
       pos += c.len_utf8();
     }
 
+    if line_starts.len() == 1 {
+      line_starts.push(src.len());
+    }
+
     SourceLines { line_starts }
   }
 

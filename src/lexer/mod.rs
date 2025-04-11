@@ -226,24 +226,3 @@ pub fn tokenize(src: &str) -> Result<Vec<Token>, Vec<LexerError>> {
     Err(errors)
   }
 }
-
-
-
-
-
-/*
-
-3. Lexical Analysis: Building a Lexer
-
-  What is Lexical Analysis?
-    Define tokens and explain the purpose of a lexer.
-  Defining Tokens
-    Create token definitions for identifiers, keywords, operators, literals, etc.
-  Writing the Lexer
-    Implement a lexer to scan source code and output a stream of tokens.
-  Error Handling in the Lexer
-    Handle unknown symbols or malformed input gracefully.
-  Testing the Lexer
-    Provide examples of source code and the corresponding tokens.
-
-*/

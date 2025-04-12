@@ -1,8 +1,12 @@
+use nativefunctions::print;
+
 use crate::parser::ast::{
     BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type, UnaryOp,
 };
 use core::panic;
-use std::{collections::HashMap, fmt, rc::Rc};
+use std::{collections::HashMap, fmt};
+
+mod nativefunctions;
 
 #[derive(Debug, Clone)]
 pub enum EvalValue {
@@ -22,7 +26,7 @@ impl EvalValue {
 }
 
 #[derive(Clone)]
-pub struct NativeFunction(Rc<dyn Fn(Vec<Value>) -> Value>);
+pub struct NativeFunction(fn(Vec<Value>) -> Value);
 
 impl fmt::Debug for NativeFunction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -124,18 +128,7 @@ impl Environment {
 
         env.define(
             "print".to_string(),
-            Value::NativeFunction(NativeFunction(Rc::new(|args: Vec<Value>| {
-                let mut output = String::new();
-                for (i, arg) in args.iter().enumerate() {
-                    if i > 0 {
-                        output.push_str(", ");
-                    }
-
-                    output.push_str(&format!("{}", arg));
-                }
-                println!("{}", output);
-                Value::Void
-            }))),
+            Value::NativeFunction(NativeFunction(print)),
         );
 
         env

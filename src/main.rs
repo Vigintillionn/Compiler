@@ -25,15 +25,19 @@ fn main() -> Result<(), String> {
 
     //   print(fib(10));
     // ";
-    let code = "var & = 10;";
+    let code = "proc a(b: int, c: int) -> int {
+        ret b * c;
+    }
+    print(10 + a(20 + 10 * 2, 3));";
 
     let tokens = tokenize(code);
     let source_lines = sourcelines::SourceLines::new(code);
 
     if let Ok(tokens) = tokens {
         let ast = parse(tokens.as_slice());
+        println!("{:#?}", ast);
         if let Ok(ast) = ast {
-            ast.eval(&mut interpreter::Environment::new());
+            let val = ast.eval(&mut interpreter::Environment::new());
         } else {
             let errors = ast.unwrap_err();
             errors

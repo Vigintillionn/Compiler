@@ -12,6 +12,7 @@ pub enum ParserError {
     InvalidExpression(usize, usize, usize), // (line, column, index)
     InvalidStatement(usize, usize, usize),  // (line, column, index)
     MissingToken(Location, TokenKind),      // (line, column, index)
+    MismatchedParantheses(usize, usize, usize), // (start, end)
     ExpectedIdentifier(Token),
     Other(String), // TODO: improve the locations here
 }
@@ -24,6 +25,7 @@ impl ParserError {
             ParserError::InvalidStatement(_, _, pos) => *pos,
             ParserError::MissingToken(location, _) => location.pos,
             ParserError::ExpectedIdentifier(token) => token.pos,
+            ParserError::MismatchedParantheses(start, end, _) => std::cmp::max(*start, *end),
             ParserError::Other(_) => 0,
         }
     }
@@ -34,6 +36,7 @@ impl ParserError {
             ParserError::InvalidExpression(_, _, _) => 2,
             ParserError::InvalidStatement(_, _, _) => 2,
             ParserError::ExpectedIdentifier(_) => 2,
+            ParserError::MismatchedParantheses(_, _, _) => 2,
             ParserError::UnexpectedToken(_, _, _) => 1,
             ParserError::Other(_) => 0,
         }
@@ -87,6 +90,9 @@ impl fmt::Display for ParserError {
             }
             ParserError::ExpectedIdentifier(token) => {
                 write!(f, "Expected identifier but found {:?}", token)
+            }
+            ParserError::MismatchedParantheses(start, end, _) => {
+                write!(f, "Mismatched parentheses at {} and {}", start, end)
             }
             ParserError::Other(msg) => write!(f, "{}", msg),
         }

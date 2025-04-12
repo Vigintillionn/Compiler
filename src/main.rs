@@ -38,7 +38,7 @@ fn main() -> Result<(), String> {
             let errors = ast.unwrap_err();
             errors
                 .iter()
-                .for_each(|e| report_error(e, &code, &source_lines));
+                .for_each(|e| report_error(e, code, &source_lines));
             // for err in &errors {
             //   match err {
             //     ParserError::ExpectedIdentifier(tok) => {
@@ -62,7 +62,7 @@ fn main() -> Result<(), String> {
         let errors = tokens.unwrap_err();
         errors
             .iter()
-            .for_each(|e| report_error(e, &code, &source_lines));
+            .for_each(|e| report_error(e, code, &source_lines));
         eprintln!("Found {} errors", errors.len());
     }
 

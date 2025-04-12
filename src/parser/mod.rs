@@ -47,7 +47,7 @@ impl<'a> Parser<'a> {
         let (name, tokens) = Self::parse_ident(tokens)?;
 
         let (colon, tokens) = opt(TokenKind::Colon).parse(tokens)?;
-        let (ty, tokens) = if let Some(_) = colon {
+        let (ty, tokens) = if colon.is_some() {
             Self::parse_type(tokens).map(|(ty, tokens)| (Some(ty), tokens))?
         } else {
             (None, tokens)
@@ -78,7 +78,7 @@ impl<'a> Parser<'a> {
         )(tokens)?;
         let (then_block, tokens) = Self::parse_block(tokens)?;
         let (has_else, tokens) = opt(TokenKind::Else)(tokens)?;
-        let (else_block, tokens) = if let Some(_) = has_else {
+        let (else_block, tokens) = if has_else.is_some() {
             Self::parse_block(tokens).map(|(else_block, tokens)| (Some(else_block), tokens))?
         } else {
             (None, tokens)
@@ -402,11 +402,11 @@ impl Iterator for Parser<'_> {
 }
 
 pub fn parse(tokens: &[Token]) -> Result<Program, Vec<ParserError>> {
-    let mut parser = Parser::new(tokens);
+    let parser = Parser::new(tokens);
     let mut stmts = Vec::new();
     let mut errors = Vec::new();
 
-    while let Some(stmt) = parser.next() {
+    for stmt in parser {
         match stmt {
             Ok(stmt) => stmts.push(stmt),
             Err(e) => errors.push(e),

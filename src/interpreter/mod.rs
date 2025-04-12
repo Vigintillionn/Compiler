@@ -187,6 +187,7 @@ pub trait Eval {
 }
 
 impl Eval for Program {
+    #[allow(clippy::double_ended_iterator_last)]
     fn eval(self, env: &mut Environment) -> EvalValue {
         self.0
             .into_iter()
@@ -286,7 +287,6 @@ impl Eval for Stmt {
             }
             Break => EvalValue::Break,
             Continue => EvalValue::Continue,
-            _ => panic!("{:?} unimplemented", self),
         }
     }
 }

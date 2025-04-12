@@ -39,7 +39,7 @@ impl<'a> Lexer<'a> {
             .src
             .chars()
             .position(|c| !pred(c))
-            .unwrap_or_else(|| self.src.len());
+            .unwrap_or(self.src.len());
         (&self.src[..end], end)
     }
 
@@ -166,7 +166,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn tokenize_number(&mut self) -> LexerResult<(TokenKind, usize)> {
-        let (num, bytes) = self.take_while(|c| c.is_digit(10) || c == '.');
+        let (num, bytes) = self.take_while(|c| c.is_ascii_digit() || c == '.');
         if num.contains('.') {
             let num = num
                 .parse::<f64>()
@@ -230,11 +230,11 @@ impl Iterator for Lexer<'_> {
 }
 
 pub fn tokenize(src: &str) -> Result<Vec<Token>, Vec<LexerError>> {
-    let mut lexer = Lexer::new(src);
+    let lexer = Lexer::new(src);
     let mut tokens = Vec::new();
     let mut errors = Vec::new();
 
-    while let Some(token) = lexer.next() {
+    for token in lexer {
         match token {
             Ok(tok) => tokens.push(tok),
             Err(e) => errors.push(e),

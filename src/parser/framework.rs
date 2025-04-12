@@ -1,5 +1,8 @@
 #![allow(non_snake_case)]
-use crate::{errors::{parser::ParserError, Location}, lexer::tokens::{Token, TokenKind}};
+use crate::{
+    errors::{parser::ParserError, Location},
+    lexer::tokens::{Token, TokenKind},
+};
 
 macro_rules! impl_then_tuple {
   ($th:ident $ph:ident) => {
@@ -50,42 +53,48 @@ macro_rules! impl_then_tuple {
 impl_then_tuple!(T1 P1, T2 P2, T3 P3, T4 P4, T5 P5, T6 P6, T7 P7, T8 P8, T9 P9, T10 P10, T11 P11, T12 P12);
 
 pub trait Parser<'a, T> {
-  fn parse(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError>;
-  fn and_then<P>(&mut self, mut other: P) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
-  where
-    P: Parser<'a, T>
-  {
-    move |input: &'a [Token]| {
-      let (_, rest) = self.parse(input)?;
-      other.parse(rest)
+    fn parse(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError>;
+    fn and_then<P>(
+        &mut self,
+        mut other: P,
+    ) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+    where
+        P: Parser<'a, T>,
+    {
+        move |input: &'a [Token]| {
+            let (_, rest) = self.parse(input)?;
+            other.parse(rest)
+        }
     }
-  }
 }
 
 pub trait Choice<'a, T> {
-  fn choice(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError>;
+    fn choice(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError>;
 }
 
 impl<'a> Parser<'a, Token> for TokenKind {
-  fn parse(&mut self, input: &'a[Token]) -> Result<(Token, &'a[Token]), ParserError> {
-    if let Some((first, rest)) = input.split_first() {
-      if *self == first.kind {
-        return Ok(((*first).clone(), rest))
-      } else {
-        return Err(ParserError::MissingToken(Location::from(first), self.clone()))
-      }
+    fn parse(&mut self, input: &'a [Token]) -> Result<(Token, &'a [Token]), ParserError> {
+        if let Some((first, rest)) = input.split_first() {
+            if *self == first.kind {
+                return Ok(((*first).clone(), rest));
+            } else {
+                return Err(ParserError::MissingToken(
+                    Location::from(first),
+                    self.clone(),
+                ));
+            }
+        }
+        Err(ParserError::Other("".to_string())) // TODO: Handle this case properly
     }
-    Err(ParserError::Other("".to_string())) // TODO: Handle this case properly
-  }
 }
 
 impl<'a, T, F> Parser<'a, T> for F
 where
-  F: FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>,
+    F: FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>,
 {
-  fn parse(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError> {
-    self(input)
-  }
+    fn parse(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError> {
+        self(input)
+    }
 }
 
 // impl<'a, T1, T2, P1, P1> Parser<'a, (T1, T2)> for (P1, P2)
@@ -246,104 +255,124 @@ choice_trait_impl!(P1 P2 P3 P4 P5 P6 P7 P8 P9 P10 P11 P12 P13 P14 P15);
 //   move |input: &'a [Token]| parser.parse(input)
 // }
 
-pub fn alt<'a, T, L>(mut parsers: L) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+pub fn alt<'a, T, L>(
+    mut parsers: L,
+) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
 where
-  L: Choice<'a, T>
+    L: Choice<'a, T>,
 {
-  move |input: &'a [Token]| parsers.choice(input)
+    move |input: &'a [Token]| parsers.choice(input)
 }
 
-pub fn opt<'a, T, P>(mut parser: P) -> impl FnMut(&'a [Token]) -> Result<(Option<T>, &'a [Token]), ParserError>
+pub fn opt<'a, T, P>(
+    mut parser: P,
+) -> impl FnMut(&'a [Token]) -> Result<(Option<T>, &'a [Token]), ParserError>
 where
-  P: Parser<'a, T>
+    P: Parser<'a, T>,
 {
-  move |input: &'a [Token]| {
-    match parser.parse(input) {
-      Ok((res, rest)) => Ok((Some(res), rest)),
-      Err(_) => Ok((None, input))
+    move |input: &'a [Token]| match parser.parse(input) {
+        Ok((res, rest)) => Ok((Some(res), rest)),
+        Err(_) => Ok((None, input)),
     }
-  }
 }
 
-pub fn many<'a, T, P>(mut parser: P) -> impl FnMut(&'a [Token]) -> Result<(Vec<T>, &'a [Token]), ParserError>
+pub fn many<'a, T, P>(
+    mut parser: P,
+) -> impl FnMut(&'a [Token]) -> Result<(Vec<T>, &'a [Token]), ParserError>
 where
-  P: Parser<'a, T>
+    P: Parser<'a, T>,
 {
-  move |input: &'a [Token]| {
-    let mut rest = input;
-    let mut results = Vec::new();
-    while let Ok((res, next_rest)) = parser.parse(rest) {
-      results.push(res);
-      rest = next_rest;
+    move |input: &'a [Token]| {
+        let mut rest = input;
+        let mut results = Vec::new();
+        while let Ok((res, next_rest)) = parser.parse(rest) {
+            results.push(res);
+            rest = next_rest;
+        }
+        Ok((results, rest))
     }
-    Ok((results, rest))
-  }
 }
 
-pub fn delimited<'a, T, P1, P2, P3>(mut open: P1, mut parser: P2, mut close: P3) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+pub fn delimited<'a, T, P1, P2, P3>(
+    mut open: P1,
+    mut parser: P2,
+    mut close: P3,
+) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
 where
-  P1: Parser<'a, Token>,
-  P2: Parser<'a, T>,
-  P3: Parser<'a, Token>
+    P1: Parser<'a, Token>,
+    P2: Parser<'a, T>,
+    P3: Parser<'a, Token>,
 {
-  move |input: &'a [Token]| {
-    let (_, rest) = open.parse(input)?;
-    let (res, rest) = parser.parse(rest)?;
-    let (_, rest) = close.parse(rest)?;
-    Ok((res, rest))
-  }
-}
-
-pub fn preceded<'a, T, U, P1, P2>(mut first: P1, mut second: P2) -> impl FnMut(&'a [Token]) -> Result<(U, &'a [Token]), ParserError>
-where
-  P1: Parser<'a, T>,
-  P2: Parser<'a, U>
-{
-  move |input: &'a [Token]| {
-    let (_, rest) = first.parse(input)?;
-    let (res, rest) = second.parse(rest)?;
-    Ok((res, rest))
-  }
-}
-
-pub fn terminated<'a, T, U, P1, P2>(mut first: P1, mut second: P2) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
-where
-  P1: Parser<'a, T>,
-  P2: Parser<'a, U>
-{
-  move |input: &'a [Token]| {
-    let (res, rest) = first.parse(input)?;
-    let (_, rest) = second.parse(rest)?;
-    Ok((res, rest))
-  }
-}
-
-pub fn map<'a, T, U, F, P>(mut parser: P, mut f: F) -> impl FnMut(&'a [Token]) -> Result<(U, &'a [Token]), ParserError>
-where
-  P: Parser<'a, T>,
-  F: FnMut(T) -> U
-{
-  move |input: &'a [Token]| {
-    let (res, rest) = parser.parse(input)?;
-    Ok((f(res), rest))
-  }
-}
-
-pub fn seperated_list<'a, T, U, P1, P2>(mut first: P1, mut second: P2) -> impl FnMut(&'a [Token]) -> Result<(Vec<T>, &'a [Token]), ParserError>
-where 
-  P1: Parser<'a, T>,
-  P2: Parser<'a, U>
-{
-  move |input: &'a [Token]| {
-    let (first_res, mut rest) = first.parse(input)?;
-    let mut results = vec![first_res];
-
-    while let Ok((_, next_rest)) = second.parse(rest) {
-      let (res, next_rest) = first.parse(next_rest)?;
-      results.push(res);
-      rest = next_rest;
+    move |input: &'a [Token]| {
+        let (_, rest) = open.parse(input)?;
+        let (res, rest) = parser.parse(rest)?;
+        let (_, rest) = close.parse(rest)?;
+        Ok((res, rest))
     }
+}
 
-    Ok((results, rest))
-  }
+pub fn preceded<'a, T, U, P1, P2>(
+    mut first: P1,
+    mut second: P2,
+) -> impl FnMut(&'a [Token]) -> Result<(U, &'a [Token]), ParserError>
+where
+    P1: Parser<'a, T>,
+    P2: Parser<'a, U>,
+{
+    move |input: &'a [Token]| {
+        let (_, rest) = first.parse(input)?;
+        let (res, rest) = second.parse(rest)?;
+        Ok((res, rest))
+    }
+}
+
+pub fn terminated<'a, T, U, P1, P2>(
+    mut first: P1,
+    mut second: P2,
+) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+where
+    P1: Parser<'a, T>,
+    P2: Parser<'a, U>,
+{
+    move |input: &'a [Token]| {
+        let (res, rest) = first.parse(input)?;
+        let (_, rest) = second.parse(rest)?;
+        Ok((res, rest))
+    }
+}
+
+pub fn map<'a, T, U, F, P>(
+    mut parser: P,
+    mut f: F,
+) -> impl FnMut(&'a [Token]) -> Result<(U, &'a [Token]), ParserError>
+where
+    P: Parser<'a, T>,
+    F: FnMut(T) -> U,
+{
+    move |input: &'a [Token]| {
+        let (res, rest) = parser.parse(input)?;
+        Ok((f(res), rest))
+    }
+}
+
+pub fn seperated_list<'a, T, U, P1, P2>(
+    mut first: P1,
+    mut second: P2,
+) -> impl FnMut(&'a [Token]) -> Result<(Vec<T>, &'a [Token]), ParserError>
+where
+    P1: Parser<'a, T>,
+    P2: Parser<'a, U>,
+{
+    move |input: &'a [Token]| {
+        let (first_res, mut rest) = first.parse(input)?;
+        let mut results = vec![first_res];
+
+        while let Ok((_, next_rest)) = second.parse(rest) {
+            let (res, next_rest) = first.parse(next_rest)?;
+            results.push(res);
+            rest = next_rest;
+        }
+
+        Ok((results, rest))
+    }
 }

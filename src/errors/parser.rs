@@ -4,7 +4,7 @@ use crate::{lexer::tokens::TokenKind, Token};
 
 use super::{Location, ReportableError};
 
-pub type ParseResult<T> = Result<T, ParserError>;
+pub type ParserResult<T> = Result<T, ParserError>;
 
 #[derive(Debug, Clone)]
 pub enum ParserError {

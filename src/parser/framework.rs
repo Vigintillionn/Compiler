@@ -1,6 +1,9 @@
 #![allow(non_snake_case)]
 use crate::{
-    errors::{parser::ParserError, Location},
+    errors::{
+        parser::{ParserError, ParserResult},
+        Location,
+    },
     lexer::tokens::{Token, TokenKind},
 };
 
@@ -10,7 +13,7 @@ macro_rules! impl_then_tuple {
     where
       $ph: Parser<'a, $th>
     {
-      fn parse(&mut self, input: &'a [Token]) -> Result<(($th,), &'a [Token]), ParserError> {
+      fn parse(&mut self, input: &'a [Token]) -> ParserResult<(($th,), &'a [Token])> {
         let ($ph,) = self;
         let (res, rest) = $ph.parse(input)?;
         Ok(((res,), rest))
@@ -24,7 +27,7 @@ macro_rules! impl_then_tuple {
       $ph: Parser<'a, $th>,
       $($p: Parser<'a, $t>),*
     {
-      fn parse(&mut self, input: &'a [Token]) -> Result<(($th, $($t),*), &'a [Token]), ParserError> {
+      fn parse(&mut self, input: &'a [Token]) -> ParserResult<(($th, $($t),*), &'a [Token])> {
         let mut rest = input;
         let ($ph, $($p,)*) = self;
         let result = (
@@ -53,11 +56,11 @@ macro_rules! impl_then_tuple {
 impl_then_tuple!(T1 P1, T2 P2, T3 P3, T4 P4, T5 P5, T6 P6, T7 P7, T8 P8, T9 P9, T10 P10, T11 P11, T12 P12);
 
 pub trait Parser<'a, T> {
-    fn parse(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError>;
+    fn parse(&mut self, input: &'a [Token]) -> ParserResult<(T, &'a [Token])>;
     fn and_then<P>(
         &mut self,
         mut other: P,
-    ) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+    ) -> impl FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>
     where
         P: Parser<'a, T>,
     {
@@ -69,11 +72,11 @@ pub trait Parser<'a, T> {
 }
 
 pub trait Choice<'a, T> {
-    fn choice(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError>;
+    fn choice(&mut self, input: &'a [Token]) -> ParserResult<(T, &'a [Token])>;
 }
 
 impl<'a> Parser<'a, Token> for TokenKind {
-    fn parse(&mut self, input: &'a [Token]) -> Result<(Token, &'a [Token]), ParserError> {
+    fn parse(&mut self, input: &'a [Token]) -> ParserResult<(Token, &'a [Token])> {
         if let Some((first, rest)) = input.split_first() {
             if *self == first.kind {
                 return Ok(((*first).clone(), rest));
@@ -90,9 +93,9 @@ impl<'a> Parser<'a, Token> for TokenKind {
 
 impl<'a, T, F> Parser<'a, T> for F
 where
-    F: FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>,
+    F: FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>,
 {
-    fn parse(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError> {
+    fn parse(&mut self, input: &'a [Token]) -> ParserResult<(T, &'a [Token])> {
         self(input)
     }
 }
@@ -134,7 +137,7 @@ macro_rules! choice_trait_impl {
     where
       $ph: Parser<'a, T>
     {
-      fn choice(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError> {
+      fn choice(&mut self, input: &'a [Token]) -> ParserResult<(T, &'a [Token])> {
         self.0.parse(input)
       }
     }
@@ -146,7 +149,7 @@ macro_rules! choice_trait_impl {
       $ph: Parser<'a, T>,
       $($p: Parser<'a, T>),+
     {
-      fn choice(&mut self, input: &'a [Token]) -> Result<(T, &'a [Token]), ParserError> {
+      fn choice(&mut self, input: &'a [Token]) -> ParserResult<(T, &'a [Token])> {
         match self.0.parse(input) {
           Err(e) => choice_trait_inner!(1, self, input, e, $ph $($p)+),
           res => res
@@ -255,9 +258,7 @@ choice_trait_impl!(P1 P2 P3 P4 P5 P6 P7 P8 P9 P10 P11 P12 P13 P14 P15);
 //   move |input: &'a [Token]| parser.parse(input)
 // }
 
-pub fn alt<'a, T, L>(
-    mut parsers: L,
-) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+pub fn alt<'a, T, L>(mut parsers: L) -> impl FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>
 where
     L: Choice<'a, T>,
 {
@@ -266,7 +267,7 @@ where
 
 pub fn opt<'a, T, P>(
     mut parser: P,
-) -> impl FnMut(&'a [Token]) -> Result<(Option<T>, &'a [Token]), ParserError>
+) -> impl FnMut(&'a [Token]) -> ParserResult<(Option<T>, &'a [Token])>
 where
     P: Parser<'a, T>,
 {
@@ -278,7 +279,7 @@ where
 
 pub fn many<'a, T, P>(
     mut parser: P,
-) -> impl FnMut(&'a [Token]) -> Result<(Vec<T>, &'a [Token]), ParserError>
+) -> impl FnMut(&'a [Token]) -> ParserResult<(Vec<T>, &'a [Token])>
 where
     P: Parser<'a, T>,
 {
@@ -297,7 +298,7 @@ pub fn delimited<'a, T, P1, P2, P3>(
     mut open: P1,
     mut parser: P2,
     mut close: P3,
-) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+) -> impl FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>
 where
     P1: Parser<'a, Token>,
     P2: Parser<'a, T>,
@@ -314,7 +315,7 @@ where
 pub fn preceded<'a, T, U, P1, P2>(
     mut first: P1,
     mut second: P2,
-) -> impl FnMut(&'a [Token]) -> Result<(U, &'a [Token]), ParserError>
+) -> impl FnMut(&'a [Token]) -> ParserResult<(U, &'a [Token])>
 where
     P1: Parser<'a, T>,
     P2: Parser<'a, U>,
@@ -329,7 +330,7 @@ where
 pub fn terminated<'a, T, U, P1, P2>(
     mut first: P1,
     mut second: P2,
-) -> impl FnMut(&'a [Token]) -> Result<(T, &'a [Token]), ParserError>
+) -> impl FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>
 where
     P1: Parser<'a, T>,
     P2: Parser<'a, U>,
@@ -344,7 +345,7 @@ where
 pub fn map<'a, T, U, F, P>(
     mut parser: P,
     mut f: F,
-) -> impl FnMut(&'a [Token]) -> Result<(U, &'a [Token]), ParserError>
+) -> impl FnMut(&'a [Token]) -> ParserResult<(U, &'a [Token])>
 where
     P: Parser<'a, T>,
     F: FnMut(T) -> U,
@@ -358,7 +359,7 @@ where
 pub fn seperated_list<'a, T, U, P1, P2>(
     mut first: P1,
     mut second: P2,
-) -> impl FnMut(&'a [Token]) -> Result<(Vec<T>, &'a [Token]), ParserError>
+) -> impl FnMut(&'a [Token]) -> ParserResult<(Vec<T>, &'a [Token])>
 where
     P1: Parser<'a, T>,
     P2: Parser<'a, U>,

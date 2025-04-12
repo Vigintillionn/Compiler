@@ -1,4 +1,8 @@
-use crate::{errors::parser::ParserError, lexer::tokens::TokenKind, Token};
+use crate::{
+    errors::parser::{ParserError, ParserResult},
+    lexer::tokens::TokenKind,
+    Token,
+};
 use ast::{BinaryOp, Expr, ExprKind, LiteralValue, Program, Stmt, Type, UnaryOp};
 use framework::{
     alt, delimited, many, map, opt, preceded, seperated_list, terminated, Parser as ParserTrait,
@@ -17,7 +21,7 @@ impl<'a> Parser<'a> {
         Self { tokens }
     }
 
-    fn parse_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (stmt, tokens) = alt((
             Self::parse_var_stmt,
             Self::parse_block,
@@ -42,7 +46,7 @@ impl<'a> Parser<'a> {
         Ok((stmt, tokens))
     }
 
-    fn parse_var_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_var_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::Var.parse(tokens)?;
         let (name, tokens) = Self::parse_ident(tokens)?;
 
@@ -60,7 +64,7 @@ impl<'a> Parser<'a> {
         Ok((Stmt::Var(name, expr, RefCell::new(ty)), tokens))
     }
 
-    fn parse_assign_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_assign_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (name, tokens) = Self::parse_ident(tokens)?;
         let (_, tokens) = TokenKind::Assign.parse(tokens)?;
         let (expr, tokens) = Self::parse_expr(tokens)?;
@@ -69,7 +73,7 @@ impl<'a> Parser<'a> {
         Ok((Stmt::Assign(name, expr), tokens))
     }
 
-    fn parse_if_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_if_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::If.parse(tokens)?;
         let (cond, tokens) = delimited(
             TokenKind::OpenParen,
@@ -90,14 +94,14 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_loop_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_loop_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::Loop.parse(tokens)?;
         let (block, tokens) = Self::parse_block(tokens)?;
 
         Ok((Stmt::Loop(None, None, None, Box::new(block)), tokens))
     }
 
-    fn parse_while_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_while_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::While.parse(tokens)?;
         let (cond, tokens) = delimited(
             TokenKind::OpenParen,
@@ -109,7 +113,7 @@ impl<'a> Parser<'a> {
         Ok((Stmt::Loop(None, Some(cond), None, Box::new(block)), tokens))
     }
 
-    fn parse_for_loop(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_for_loop(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::For.parse(tokens)?;
         let (_, tokens) = TokenKind::OpenParen.parse(tokens)?;
         let (init, tokens) = opt(alt((Self::parse_var_stmt, Self::parse_assign_stmt)))(tokens)?;
@@ -150,7 +154,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_ret_stmt(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_ret_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::Ret.parse(tokens)?;
         let (expr, tokens) = opt(Self::parse_expr)(tokens)?;
         let (_, tokens) = TokenKind::Semi.parse(tokens)?;
@@ -158,7 +162,7 @@ impl<'a> Parser<'a> {
         Ok((Stmt::Ret(expr), tokens))
     }
 
-    fn parse_func_decl(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_func_decl(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let parse_arg = |tokens: &'a [Token]| {
             let (name, tokens) = Self::parse_ident(tokens)?;
             let (_, tokens) = TokenKind::Colon.parse(tokens)?;
@@ -190,7 +194,7 @@ impl<'a> Parser<'a> {
         ))
     }
 
-    fn parse_ident(tokens: &'a [Token]) -> Result<(String, &'a [Token]), ParserError> {
+    fn parse_ident(tokens: &'a [Token]) -> ParserResult<(String, &'a [Token])> {
         if let Some((token, remaining)) = tokens.split_first() {
             match &token.kind {
                 TokenKind::Identifier(name) => Ok((name.clone(), remaining)),
@@ -202,7 +206,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_block(tokens: &'a [Token]) -> Result<(Stmt, &'a [Token]), ParserError> {
+    fn parse_block(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (stmts, tokens) = delimited(
             TokenKind::OpenBrace,
             many(Self::parse_stmt),
@@ -212,7 +216,7 @@ impl<'a> Parser<'a> {
         Ok((Stmt::Block(stmts), tokens))
     }
 
-    fn parse_expr(tokens: &[Token]) -> Result<(Expr, &[Token]), ParserError> {
+    fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
         let mut tokens = tokens;
         let mut output: Vec<Expr> = Vec::new();
         let mut op_stack: Vec<&Token> = Vec::new();
@@ -339,7 +343,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_type(tokens: &'a [Token]) -> Result<(Type, &'a [Token]), ParserError> {
+    fn parse_type(tokens: &'a [Token]) -> ParserResult<(Type, &'a [Token])> {
         let parse_f_type = |tokens: &'a [Token]| {
             let (_, tokens) = TokenKind::Proc.parse(tokens)?;
             let (args, tokens) = delimited(
@@ -381,7 +385,7 @@ impl<'a> Parser<'a> {
 }
 
 impl Iterator for Parser<'_> {
-    type Item = Result<Stmt, ParserError>;
+    type Item = ParserResult<Stmt>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.tokens.is_empty() {

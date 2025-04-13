@@ -10,8 +10,8 @@ use framework::{
 use std::cell::RefCell;
 
 pub mod ast;
+mod expressions;
 mod framework;
-mod shuntingyard;
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
@@ -218,7 +218,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
-        shuntingyard::parse_expr(tokens)
+        expressions::parse_expr(tokens)
         // let mut tokens = tokens;
         // let mut output: Vec<Expr> = Vec::new();
         // let mut op_stack: Vec<&Token> = Vec::new();

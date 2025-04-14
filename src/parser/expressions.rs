@@ -16,6 +16,10 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
     let mut output: Vec<Expr> = Vec::new();
     let mut arg_stack: Vec<usize> = Vec::new();
 
+    let first_tok = tokens
+        .first()
+        .ok_or(ParserError::Other("Empty expression".to_string()))?;
+
     while let Some(token) = tokens.first() {
         match token.kind {
             IntLiteral(n) => output.push(Expr(
@@ -51,7 +55,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                     if let Some(op) = op_stack.pop() {
                         handle_operator(op, &mut output)?;
                     } else {
-                        return Err(ParserError::MismatchedParantheses(0, 0, 0));
+                        return Err(ParserError::MismatchedParantheses(token.clone()));
                     }
                 }
 
@@ -63,7 +67,9 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                         ..
                     })
                 ) {
-                    return Err(ParserError::MismatchedParantheses(0, 0, 0));
+                    return Err(ParserError::MismatchedParantheses(
+                        op_stack.last().copied().unwrap().clone(),
+                    ));
                 }
                 op_stack.pop();
 
@@ -79,7 +85,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                         ..
                     }) = op_stack.pop()
                     else {
-                        return Err(ParserError::MismatchedParantheses(0, 0, 0));
+                        return Err(ParserError::InvalidExpression(token.clone()));
                     };
                     let args = output.split_off(
                         output
@@ -105,7 +111,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                 });
             }
             _ if token.kind.op_info().is_some() => {
-                let op_info = token.kind.op_info().unwrap();
+                let op_info = token.kind.op_info().unwrap(); // Safe to unwrap because we checked above
                 if op_info.is_unary {
                     op_stack.push(token);
                 } else {
@@ -154,7 +160,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
 
     while let Some(op) = op_stack.pop() {
         if matches!(op.kind, TokenKind::OpenParen) {
-            return Err(ParserError::MismatchedParantheses(0, 0, 0));
+            return Err(ParserError::MismatchedParantheses(op.clone()));
         }
         handle_operator(op, &mut output)?;
     }
@@ -162,7 +168,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
     if output.len() == 1 {
         Ok((output.pop().unwrap(), tokens))
     } else {
-        Err(ParserError::InvalidExpression(0, 0, 0)) // TODO ERROR
+        Err(ParserError::InvalidExpression(first_tok.clone())) // TODO ERROR
     }
 }
 

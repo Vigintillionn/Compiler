@@ -1,9 +1,10 @@
 use crate::{
     errors::parser::{ParserError, ParserResult},
-    lexer::tokens::{OpInfo, TokenKind},
+    lexer::tokens::TokenKind,
     Token,
 };
-use ast::{BinaryOp, Expr, ExprKind, LiteralValue, Program, Stmt, Type, UnaryOp};
+use ast::{Program, Stmt, Type};
+use expressions::parse_expr;
 use framework::{
     alt, delimited, many, map, opt, preceded, seperated_list, terminated, Parser as ParserTrait,
 };
@@ -39,7 +40,7 @@ impl<'a> Parser<'a> {
             map(terminated(TokenKind::Continue, TokenKind::Semi), |_| {
                 Stmt::Continue
             }),
-            map(terminated(Self::parse_expr, TokenKind::Semi), |expr| {
+            map(terminated(parse_expr, TokenKind::Semi), |expr| {
                 Stmt::Expr(expr)
             }),
         ))(tokens)?;
@@ -59,7 +60,7 @@ impl<'a> Parser<'a> {
         };
 
         let (_, tokens) = TokenKind::Assign.parse(tokens)?;
-        let (expr, tokens) = Self::parse_expr(tokens)?;
+        let (expr, tokens) = parse_expr(tokens)?;
         let (_, tokens) = TokenKind::Semi.parse(tokens)?;
 
         Ok((Stmt::Var(name, expr, RefCell::new(ty)), tokens))
@@ -68,7 +69,7 @@ impl<'a> Parser<'a> {
     fn parse_assign_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (name, tokens) = Self::parse_ident(tokens)?;
         let (_, tokens) = TokenKind::Assign.parse(tokens)?;
-        let (expr, tokens) = Self::parse_expr(tokens)?;
+        let (expr, tokens) = parse_expr(tokens)?;
         let (_, tokens) = TokenKind::Semi.parse(tokens)?;
 
         Ok((Stmt::Assign(name, expr), tokens))
@@ -76,11 +77,8 @@ impl<'a> Parser<'a> {
 
     fn parse_if_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::If.parse(tokens)?;
-        let (cond, tokens) = delimited(
-            TokenKind::OpenParen,
-            Self::parse_expr,
-            TokenKind::CloseParen,
-        )(tokens)?;
+        let (cond, tokens) =
+            delimited(TokenKind::OpenParen, parse_expr, TokenKind::CloseParen)(tokens)?;
         let (then_block, tokens) = Self::parse_block(tokens)?;
         let (has_else, tokens) = opt(TokenKind::Else)(tokens)?;
         let (else_block, tokens) = if has_else.is_some() {
@@ -104,11 +102,8 @@ impl<'a> Parser<'a> {
 
     fn parse_while_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::While.parse(tokens)?;
-        let (cond, tokens) = delimited(
-            TokenKind::OpenParen,
-            Self::parse_expr,
-            TokenKind::CloseParen,
-        )(tokens)?;
+        let (cond, tokens) =
+            delimited(TokenKind::OpenParen, parse_expr, TokenKind::CloseParen)(tokens)?;
         let (block, tokens) = Self::parse_block(tokens)?;
 
         Ok((Stmt::Loop(None, Some(cond), None, Box::new(block)), tokens))
@@ -125,13 +120,13 @@ impl<'a> Parser<'a> {
             tokens
         };
 
-        let (cond, tokens) = opt(Self::parse_expr)(tokens)?;
+        let (cond, tokens) = opt(parse_expr)(tokens)?;
         let (_, tokens) = TokenKind::Semi.parse(tokens)?;
 
         let (name, tokens) = opt(Self::parse_ident)(tokens)?;
         let (update, tokens) = if name.is_some() {
             let (_, tokens) = TokenKind::Assign.parse(tokens)?;
-            let (update, tokens) = Self::parse_expr(tokens)?;
+            let (update, tokens) = parse_expr(tokens)?;
 
             (
                 Some(Stmt::Assign(name.expect("Name is not some"), update)),
@@ -157,7 +152,7 @@ impl<'a> Parser<'a> {
 
     fn parse_ret_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::Ret.parse(tokens)?;
-        let (expr, tokens) = opt(Self::parse_expr)(tokens)?;
+        let (expr, tokens) = opt(parse_expr)(tokens)?;
         let (_, tokens) = TokenKind::Semi.parse(tokens)?;
 
         Ok((Stmt::Ret(expr), tokens))
@@ -217,205 +212,6 @@ impl<'a> Parser<'a> {
         Ok((Stmt::Block(stmts), tokens))
     }
 
-    fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
-        expressions::parse_expr(tokens)
-        // let mut tokens = tokens;
-        // let mut output: Vec<Expr> = Vec::new();
-        // let mut op_stack: Vec<&Token> = Vec::new();
-
-        // let mut cur_col = 0usize;
-        // let mut cur_line = 0usize;
-        // let mut cur_pos = 0usize;
-
-        // while let Some(token) = tokens.first() {
-        //     let Token {
-        //         kind,
-        //         line,
-        //         col,
-        //         pos,
-        //     } = token;
-        //     cur_col = *col;
-        //     cur_line = *line;
-        //     cur_pos = *pos;
-        //     match kind {
-        //         TokenKind::Identifier(name) => {
-        //             println!("Ident: {:?}", name);
-        //             if tokens.len() > 1 && tokens[1].kind == TokenKind::OpenParen {
-        //                 op_stack.push(token);
-        //                 // println!("Function call: {:?}", name);
-        //                 // tokens = &tokens[1..];
-        //                 // println!("Tokens: {:?}", tokens);
-        //                 // // Parse function call arguments
-        //                 // let (args, rest) = delimited(
-        //                 //     TokenKind::OpenParen,
-        //                 //     seperated_list(Self::parse_expr, TokenKind::Comma),
-        //                 //     TokenKind::CloseParen,
-        //                 // )(tokens)?;
-        //                 // println!("HELLO");
-        //                 // output.push(Expr(ExprKind::Call(name.clone(), args), RefCell::new(None)));
-        //                 // tokens = rest;
-        //                 // println!("{:?} {:?}", tokens, rest);
-        //                 // continue;
-        //             } else {
-        //                 output.push(Expr(ExprKind::Ident(name.clone()), RefCell::new(None)))
-        //             }
-        //         }
-        //         TokenKind::Comma => {
-        //             while let Some(&top_tok) = op_stack.last() {
-        //                 if let TokenKind::OpenParen = top_tok.kind {
-        //                     break;
-        //                 }
-        //                 let op_info = top_tok.kind.op_info().unwrap(); // TODO handle unwrap
-        //                 Self::operator_into_output(&mut op_stack, &mut output, &op_info);
-        //             }
-        //         }
-        //         TokenKind::OpenParen => op_stack.push(token),
-        //         TokenKind::CloseParen => {
-        //             if op_stack.is_empty() {
-        //                 return Err(ParserError::MismatchedParantheses(
-        //                     cur_line, cur_col, cur_pos,
-        //                 ));
-        //             }
-        //             while let Some(&top_tok) = op_stack.last() {
-        //                 if let TokenKind::OpenParen = top_tok.kind {
-        //                     op_stack.pop();
-        //                     break;
-        //                 } else {
-        //                     let op_info = top_tok.kind.op_info().ok_or(
-        //                         ParserError::MismatchedParantheses(cur_line, cur_col, cur_pos),
-        //                     )?;
-        //                     Self::operator_into_output(&mut op_stack, &mut output, &op_info);
-        //                     // let top_op = op_stack.pop().unwrap(); // TODO: handle unwrap
-        //                     // if op_stack.is_empty() {
-        //                     //     return Err(ParserError::MismatchedParantheses(
-        //                     //         cur_line, cur_col, cur_pos,
-        //                     //     ));
-        //                     // }
-        //                     // if top_op.kind.op_info().unwrap().is_unary {
-        //                     //     let operand = output.pop().expect("No operand for unary operator");
-        //                     //     output.push(Expr(
-        //                     //         ExprKind::UnaryOp(UnaryOp(top_op.into(), Box::new(operand))),
-        //                     //         RefCell::new(None),
-        //                     //     ));
-        //                     // } else {
-        //                     //     let rhs = output.pop().unwrap();
-        //                     //     let lhs = output.pop().unwrap(); // TODO: handle unwrap
-        //                     //     output.push(Expr(
-        //                     //         ExprKind::BinaryOp(BinaryOp(
-        //                     //             Box::new(lhs),
-        //                     //             top_op.into(),
-        //                     //             Box::new(rhs),
-        //                     //         )),
-        //                     //         RefCell::new(None),
-        //                     //     ));
-        //                     // }
-        //                 }
-        //             }
-        //         }
-        //         TokenKind::IntLiteral(n) => output.push(Expr(
-        //             ExprKind::Literal(LiteralValue::Integer(*n)),
-        //             RefCell::new(Some(Type::Int)),
-        //         )), // TODO: Handle typing
-        //         TokenKind::FloatLiteral(f) => output.push(Expr(
-        //             ExprKind::Literal(LiteralValue::Float(*f)),
-        //             RefCell::new(Some(Type::Float)),
-        //         )), // TODO: Handle typing
-        //         TokenKind::BoolLiteral(b) => output.push(Expr(
-        //             ExprKind::Literal(LiteralValue::Boolean(*b)),
-        //             RefCell::new(Some(Type::Boolean)),
-        //         )), // TODO: Handle typing
-        //         _ if token.kind.op_info().is_some() => {
-        //             let op_info = token.kind.op_info().expect("Token op_info is None"); // token.op_info() is not None
-        //             if op_info.is_unary {
-        //                 op_stack.push(token);
-        //             } else {
-        //                 Self::operator_into_output(&mut op_stack, &mut output, &op_info);
-        //                 op_stack.push(token);
-        //             }
-        //         }
-        //         _ => break,
-        //     }
-        //     tokens = &tokens[1..];
-        // }
-
-        // while let Some(op) = op_stack.pop() {
-        //     if matches!(op.kind, TokenKind::OpenParen | TokenKind::CloseParen) {
-        //         return Err(ParserError::MismatchedParantheses(
-        //             cur_line, cur_col, cur_pos,
-        //         ));
-        //     }
-        //     let expr = if op.kind.op_info().unwrap().is_unary {
-        //         let operand = output.pop().unwrap();
-        //         Expr(
-        //             ExprKind::UnaryOp(UnaryOp(op.into(), Box::new(operand))),
-        //             RefCell::new(None),
-        //         )
-        //     } else {
-        //         let rhs = output.pop().unwrap();
-        //         let lhs = output.pop().unwrap();
-        //         Expr(
-        //             ExprKind::BinaryOp(BinaryOp(Box::new(lhs), op.into(), Box::new(rhs))),
-        //             RefCell::new(None),
-        //         )
-        //     };
-
-        //     output.push(expr);
-        // }
-
-        // if output.len() == 1 {
-        //     Ok((output.pop().unwrap(), tokens))
-        // } else {
-        //     Err(ParserError::InvalidExpression(cur_line, cur_col, cur_pos)) // TODO ERROR
-        // }
-    }
-
-    fn operator_into_output(op_stack: &mut Vec<&Token>, output: &mut Vec<Expr>, op_info: &OpInfo) {
-        // First, apply any pending unary operators
-        while let Some(&top_op) = op_stack.last() {
-            if let TokenKind::OpenParen = top_op.kind {
-                break;
-            }
-            let top_info = top_op
-                .kind
-                .op_info()
-                .expect("Token at top of stack is not an operator");
-            if top_info.is_unary {
-                op_stack.pop();
-                let operand = output.pop().expect("No operand for unary operator");
-                output.push(Expr(
-                    ExprKind::UnaryOp(UnaryOp(top_op.into(), Box::new(operand))),
-                    RefCell::new(None),
-                ));
-            } else {
-                break;
-            }
-        }
-
-        // Next, apply any pending binary operators
-        while let Some(&top_op) = op_stack.last() {
-            // Stop if we reach a parenthesis
-            if top_op.kind == TokenKind::OpenParen {
-                break;
-            }
-            let top_info = top_op
-                .kind
-                .op_info()
-                .expect("Token at top of stack is not an operator");
-            if top_info.prec >= op_info.prec {
-                println!("Operator: {:?}", top_op.kind);
-                println!("Output: {:?}", output);
-                let rhs = output.pop().unwrap();
-                let lhs = output.pop().unwrap(); // TODO: handle unwrap
-                output.push(Expr(
-                    ExprKind::BinaryOp(BinaryOp(Box::new(lhs), top_op.into(), Box::new(rhs))),
-                    RefCell::new(None),
-                ));
-            } else {
-                break;
-            }
-        }
-    }
-
     fn parse_type(tokens: &'a [Token]) -> ParserResult<(Type, &'a [Token])> {
         let parse_f_type = |tokens: &'a [Token]| {
             let (_, tokens) = TokenKind::Proc.parse(tokens)?;
@@ -448,7 +244,13 @@ impl<'a> Parser<'a> {
     fn recover(&mut self) {
         // Recover from an error by skipping tokens until a semicolon is found
         while !self.tokens.is_empty() {
-            if self.tokens[0].kind == TokenKind::Semi {
+            if matches!(
+                self.tokens.first().unwrap(),
+                &Token {
+                    kind: TokenKind::Semi,
+                    ..
+                }
+            ) {
                 self.tokens = &self.tokens[1..];
                 return;
             }

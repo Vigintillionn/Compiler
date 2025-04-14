@@ -156,17 +156,6 @@ impl TypeCheck for Stmt {
                 if ty.borrow().is_none() {
                     *ty.borrow_mut() = Some(expr_type.clone());
                 }
-
-                // if let Some(ty) = &*ty.borrow() {
-                //     if ty != &expr_type {
-                //         return Err(format!(
-                //             "Type mismatch: expected {:?}, found {:?}",
-                //             ty, expr_type
-                //         ));
-                //     }
-                // } else {
-                //     *ty.borrow_mut() = Some(expr_type.clone());
-                // }
                 env.define(name.clone(), expr_type.clone());
                 Ok(Type::Void)
             }
@@ -252,7 +241,6 @@ impl TypeCheck for Stmt {
                 Ok(Type::Void)
             }
             Continue | Break => Ok(Type::Void),
-            _ => todo!(),
         }
     }
 }

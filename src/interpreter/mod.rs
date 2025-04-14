@@ -1,187 +1,24 @@
 use nativefunctions::print;
 
-use crate::parser::ast::{
-    BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type, UnaryOp,
+use crate::{
+    environment::Environment,
+    parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, UnaryOp},
 };
 use core::panic;
-use std::{collections::HashMap, fmt};
+use values::{EvalValue, NativeFunction, Value};
 
 mod nativefunctions;
+mod values;
 
-#[derive(Debug, Clone)]
-pub enum EvalValue {
-    Value(Value),
-    Return(Value),
-    Break,
-    Continue, // TODO: maybe add break and continue
-}
+type EvalEnvironment = Environment<Value>;
 
-impl EvalValue {
-    fn into_value(self) -> Value {
-        match self {
-            EvalValue::Value(v) | EvalValue::Return(v) => v,
-            EvalValue::Break | EvalValue::Continue => panic!("Cannot convert break to value"),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct NativeFunction(fn(Vec<Value>) -> Value);
-
-impl fmt::Debug for NativeFunction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "NativeFunction")
-    }
-}
-
-#[derive(Debug, Clone)]
-pub enum Value {
-    Int(i64),
-    Float(f64),
-    String(String),
-    Boolean(bool),
-    Void,
-    Pointer(Box<Value>),
-    Function(Vec<(String, Type)>, Type, Stmt),
-    NativeFunction(NativeFunction),
-}
-
-impl Value {
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            Value::Boolean(val) => *val,
-            Value::Int(val) => val != &0,
-            Value::Float(val) => val != &0.0,
-            Value::String(val) => !val.is_empty(),
-            Value::Void => false,
-            _ => true,
-        }
-    }
-}
-
-impl PartialEq for Value {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Value::Int(lhs), Value::Int(rhs)) => lhs == rhs,
-            (Value::Float(lhs), Value::Float(rhs)) => lhs == rhs,
-            (Value::String(lhs), Value::String(rhs)) => lhs == rhs,
-            (Value::Boolean(lhs), Value::Boolean(rhs)) => lhs == rhs,
-            (Value::Void, Value::Void) => true,
-            _ => false,
-        }
-    }
-}
-
-impl Eq for Value {}
-
-impl PartialOrd for Value {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for Value {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match (self, other) {
-            (Value::Int(lhs), Value::Int(rhs)) => lhs.cmp(rhs),
-            (Value::Float(lhs), Value::Float(rhs)) => lhs.partial_cmp(rhs).unwrap(),
-            (Value::String(lhs), Value::String(rhs)) => lhs.cmp(rhs),
-            _ => panic!("Cannot compare values"),
-        }
-    }
-}
-
-impl fmt::Display for Value {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Value::Int(val) => write!(f, "{}", val),
-            Value::Float(val) => write!(f, "{}", val),
-            Value::String(val) => write!(f, "{}", val),
-            Value::Boolean(val) => write!(f, "{}", val),
-            Value::Void => write!(f, "void"),
-            Value::Pointer(val) => write!(f, "Pointer({})", *val),
-            Value::Function(params, ret, _) => write!(
-                f,
-                "proc({}) -> {:?}",
-                params
-                    .iter()
-                    .map(|(n, t)| format!("{}: {:?}", n, t))
-                    .collect::<Vec<String>>()
-                    .join(", "),
-                ret
-            ),
-            Value::NativeFunction(_) => write!(f, "<native function>"),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct Environment {
-    scopes: Vec<HashMap<String, Value>>,
-}
-
-impl Environment {
-    pub fn new() -> Self {
-        let mut env = Self {
-            scopes: vec![HashMap::new()],
-        };
-
-        env.define(
-            "print".to_string(),
-            Value::NativeFunction(NativeFunction(print)),
-        );
-
-        env
-    }
-
-    pub fn enter_scope(&mut self) {
-        self.scopes.push(HashMap::new());
-    }
-
-    pub fn exit_scope(&mut self) -> Result<(), String> {
-        if self.scopes.len() == 1 {
-            Err("Cannot exit the global scope".to_string())
-        } else {
-            self.scopes.pop();
-            Ok(())
-        }
-    }
-
-    pub fn define(&mut self, name: String, val: Value) {
-        if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(name, val);
-        }
-    }
-
-    pub fn assign(&mut self, name: &str, value: Value) -> Result<(), String> {
-        for scope in self.scopes.iter_mut().rev() {
-            if scope.contains_key(name) {
-                scope.insert(name.to_string(), value);
-                return Ok(());
-            }
-        }
-
-        Err(format!("Undefined variable: {}", name))
-    }
-
-    pub fn get(&self, name: &str) -> Result<Value, String> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(val) = scope.get(name) {
-                return Ok(val.clone());
-            }
-        }
-
-        Err(format!("Undefined variable: {}", name))
-    }
-}
-
-pub trait Eval {
-    fn eval(self, env: &mut Environment) -> EvalValue;
+trait Eval {
+    fn eval(self, env: &mut EvalEnvironment) -> EvalValue;
 }
 
 impl Eval for Program {
     #[allow(clippy::double_ended_iterator_last)]
-    fn eval(self, env: &mut Environment) -> EvalValue {
+    fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
         self.0
             .into_iter()
             .map(|stmt| stmt.eval(env))
@@ -191,7 +28,7 @@ impl Eval for Program {
 }
 
 impl Eval for Stmt {
-    fn eval(self, env: &mut Environment) -> EvalValue {
+    fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
         use Stmt::*;
         match self {
             Block(stmts) => {
@@ -285,15 +122,22 @@ impl Eval for Stmt {
 }
 
 impl Eval for Expr {
-    fn eval(self, env: &mut Environment) -> EvalValue {
+    fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
         use ExprKind::*;
         match self.0 {
             Literal(value) => value.eval(env),
-            Ident(name) => EvalValue::Value(env.get(&name).unwrap_or_else(|err| panic!("{}", err))), // TODO: handle error
+            Ident(name) => EvalValue::Value(
+                env.get(&name)
+                    .ok_or_else(|| panic!("Something went wrong"))
+                    .unwrap(),
+            ), // TODO: handle error
             BinaryOp(bin) => bin.eval(env),
             UnaryOp(un) => un.eval(env),
             Call(name, args) => {
-                let func = env.get(&name).unwrap_or_else(|err| panic!("{}", err)); // TODO: handle error
+                let func = env
+                    .get(&name)
+                    .ok_or_else(|| panic!("Something went wrong"))
+                    .unwrap(); // TODO: handle error
                 match func {
                     Value::Function(params, _, body) => {
                         env.enter_scope();
@@ -319,7 +163,7 @@ impl Eval for Expr {
 }
 
 impl Eval for BinaryOp {
-    fn eval(self, env: &mut Environment) -> EvalValue {
+    fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
         let Self(lhs, op, rhs) = self;
         let lhs = lhs.eval(env).into_value();
         let rhs = rhs.eval(env).into_value();
@@ -366,7 +210,7 @@ impl Eval for BinaryOp {
 }
 
 impl Eval for UnaryOp {
-    fn eval(self, env: &mut Environment) -> EvalValue {
+    fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
         let Self(op, expr) = self;
         let val = expr.eval(env).into_value();
 
@@ -380,7 +224,7 @@ impl Eval for UnaryOp {
 }
 
 impl Eval for LiteralValue {
-    fn eval(self, _: &mut Environment) -> EvalValue {
+    fn eval(self, _: &mut EvalEnvironment) -> EvalValue {
         use LiteralValue::*;
         let v = match self {
             Integer(value) => Value::Int(value),
@@ -391,4 +235,13 @@ impl Eval for LiteralValue {
 
         EvalValue::Value(v)
     }
+}
+
+pub fn eval_program(program: Program) -> Value {
+    let mut env = EvalEnvironment::new();
+    env.define(
+        "print".to_string(),
+        Value::NativeFunction(NativeFunction(print)),
+    );
+    program.eval(&mut env).into_value()
 }

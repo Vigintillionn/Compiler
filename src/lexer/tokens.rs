@@ -84,6 +84,7 @@ pub enum TokenKind {
     Or,         // ||
 }
 
+#[derive(Debug, Clone)]
 pub enum Assoc {
     Left,
     Right,
@@ -120,7 +121,7 @@ impl TokenKind {
                 is_unary: false,
             }),
             Bang => Some(OpInfo {
-                prec: 4,
+                prec: 15,
                 assoc: Assoc::Right,
                 is_unary: true,
             }),

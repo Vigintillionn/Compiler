@@ -1,4 +1,7 @@
-use crate::{lexer::tokens::TokenKind, Token};
+use crate::{
+    lexer::tokens::{Assoc, TokenKind},
+    Token,
+};
 use std::cell::RefCell;
 
 type Block = Vec<Stmt>;
@@ -78,21 +81,30 @@ pub enum Op {
     And,
     Or,
     Not,
+
+    Negate,
+    Deref,
 }
 
-impl From<&Token> for Op {
-    fn from(value: &Token) -> Self {
-        Self::from(&value.kind)
-    }
-}
-
-impl From<&TokenKind> for Op {
-    fn from(tok: &TokenKind) -> Self {
+impl From<&DisambiguatedOp> for Op {
+    fn from(op: &DisambiguatedOp) -> Self {
         use TokenKind::*;
-        match tok {
+        match op.token.kind {
             Plus => Self::Add,
-            Minus => Self::Sub,
-            Asterisk => Self::Mul,
+            Minus => {
+                if op.is_unary {
+                    Self::Negate
+                } else {
+                    Self::Sub
+                }
+            }
+            Asterisk => {
+                if op.is_unary {
+                    Self::Deref
+                } else {
+                    Self::Mul
+                }
+            }
             Slash => Self::Div,
             Eq => Self::Eq,
             NotEq => Self::Neq,
@@ -103,7 +115,59 @@ impl From<&TokenKind> for Op {
             And => Self::And,
             Or => Self::Or,
             Bang => Self::Not,
-            _ => panic!("This is not a valid operator! {:?}", tok),
+            _ => panic!("This is not a valid operator! {:?}", op),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DisambiguatedOp {
+    pub is_unary: bool,
+    pub prec: u8,
+    pub assoc: Assoc,
+    pub token: Token,
+}
+
+impl From<&Token> for DisambiguatedOp {
+    fn from(token: &Token) -> Self {
+        let op_info = token.kind.op_info().unwrap();
+        DisambiguatedOp {
+            is_unary: op_info.is_unary,
+            prec: op_info.prec,
+            token: token.clone(),
+            assoc: op_info.assoc,
+        }
+    }
+}
+
+pub fn disambiguate(token: &Token, prev: Option<TokenKind>) -> DisambiguatedOp {
+    if matches!(token.kind, TokenKind::Asterisk | TokenKind::Minus) {
+        let is_unary = match prev {
+            None => true,                           // If it's the first token, treat it as unary
+            Some(TokenKind::OpenParen) => true, // If it's after an open parenthesis, treat it as unary
+            Some(kind) => kind.op_info().is_some(), // If the previous token is an operator, treat it as unary
+        };
+
+        let prec = if is_unary {
+            15
+        } else {
+            token.kind.op_info().unwrap().prec
+        };
+
+        DisambiguatedOp {
+            is_unary,
+            prec,
+            assoc: Assoc::Right,
+            token: token.clone(),
+        }
+    } else {
+        let prec = token.kind.op_info().unwrap().prec;
+        let assoc = token.kind.op_info().unwrap().assoc;
+        DisambiguatedOp {
+            is_unary: false,
+            prec,
+            assoc,
+            token: token.clone(),
         }
     }
 }

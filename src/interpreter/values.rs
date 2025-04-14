@@ -7,7 +7,7 @@ pub enum EvalValue {
     Value(Value),
     Return(Value),
     Break,
-    Continue, // TODO: maybe add break and continue
+    Continue,
 }
 
 impl EvalValue {

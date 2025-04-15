@@ -58,18 +58,19 @@ pub enum TokenKind {
     Bool,
 
     /* Operators */
-    Plus,     // +
-    Minus,    // -
-    Asterisk, // *
-    Slash,    // /
-    Assign,   // =
-    Bang,     // !
-    Eq,       // ==
-    NotEq,    // !=
-    LThan,    // <
-    GThan,    // >
-    LThanEq,  // <=
-    GThanEq,  // >=
+    Plus,      // +
+    Minus,     // -
+    Asterisk,  // *
+    Slash,     // /
+    Assign,    // =
+    Bang,      // !
+    Eq,        // ==
+    NotEq,     // !=
+    LThan,     // <
+    GThan,     // >
+    LThanEq,   // <=
+    GThanEq,   // >=
+    Ampersand, // &
 
     /* Other */
     Semi,       // ;
@@ -100,27 +101,37 @@ impl TokenKind {
     pub fn op_info(&self) -> Option<OpInfo> {
         use TokenKind::*;
         match self {
-            Plus | Minus => Some(OpInfo {
-                prec: 2,
+            OpenParen | CloseParen => Some(OpInfo {
+                prec: 0,
                 assoc: Assoc::Left,
-                is_unary: false,
+                is_unary: true,
             }),
-            Asterisk | Slash => Some(OpInfo {
+            Plus | Minus => Some(OpInfo {
                 prec: 3,
                 assoc: Assoc::Left,
                 is_unary: false,
             }),
+            Asterisk | Slash => Some(OpInfo {
+                prec: 4,
+                assoc: Assoc::Left,
+                is_unary: false,
+            }),
             Eq | NotEq | LThan | GThan | LThanEq | GThanEq => Some(OpInfo {
-                prec: 1,
+                prec: 2,
                 assoc: Assoc::Left,
                 is_unary: false,
             }),
             And | Or => Some(OpInfo {
-                prec: 0,
+                prec: 1,
                 assoc: Assoc::Left,
                 is_unary: false,
             }),
             Bang => Some(OpInfo {
+                prec: 15,
+                assoc: Assoc::Right,
+                is_unary: true,
+            }),
+            Ampersand => Some(OpInfo {
                 prec: 15,
                 assoc: Assoc::Right,
                 is_unary: true,
@@ -133,7 +144,7 @@ impl TokenKind {
         use TokenKind::*;
         match self {
             Plus | Minus | Asterisk | Slash | Assign | Bang | Eq | LThan | GThan | Semi | Colon
-            | OpenParen | CloseParen | OpenBrace | CloseBrace | Comma => 1,
+            | OpenParen | CloseParen | OpenBrace | CloseBrace | Comma | Ampersand => 1,
             Arrow | And | Or | If | NotEq | LThanEq | GThanEq => 2,
             For | Var | Ret | Int | Str => 3,
             Loop | Else | Proc | Bool => 4,

@@ -5,12 +5,13 @@ use crate::{
     parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, UnaryOp},
 };
 use core::panic;
+use std::{cell::RefCell, rc::Rc};
 use values::{EvalValue, NativeFunction, Value};
 
 mod nativefunctions;
 mod values;
 
-type EvalEnvironment = Environment<Value>;
+type EvalEnvironment = Environment<Rc<RefCell<Value>>>;
 
 trait Eval {
     fn eval(self, env: &mut EvalEnvironment) -> EvalValue;
@@ -45,14 +46,30 @@ impl Eval for Stmt {
             }
             Var(name, expr, _) => {
                 let val = expr.eval(env).into_value();
-                env.define(name, val);
+                env.define(name, Rc::new(RefCell::new(val)));
                 EvalValue::Value(Value::Void)
             }
-            Assign(name, expr) => {
-                let val = expr.eval(env).into_value();
-                env.assign(&name, val)
-                    .unwrap_or_else(|err| panic!("{}", err)); // TODO: handle error
-                EvalValue::Value(Value::Void)
+            Assign(lhs, rhs) => {
+                let val = rhs.eval(env).into_value();
+
+                match &lhs.0 {
+                    ExprKind::Ident(ref name) => {
+                        env.assign(&name, Rc::new(RefCell::new(val.clone())))
+                            .unwrap_or_else(|err| panic!("{}", err));
+                        EvalValue::Value(Value::Void)
+                    }
+                    ExprKind::UnaryOp(UnaryOp(Op::Deref, ref expr)) => {
+                        let pointer_val = expr.clone().eval(env).into_value(); // TODO: make this cleaner, preferably without cloning
+                        match pointer_val {
+                            Value::Pointer(ref ptr) => {
+                                *ptr.borrow_mut() = val.clone();
+                                EvalValue::Value(Value::Void)
+                            }
+                            _ => panic!("Dereference assignment on non-pointer value"),
+                        }
+                    }
+                    _ => panic!("Can't assign to this"),
+                }
             }
             If(cond, then_block, else_block) => {
                 let cond = cond.eval(env).into_value();
@@ -65,7 +82,10 @@ impl Eval for Stmt {
                 }
             }
             Function(name, args, ret, body) => {
-                env.define(name, Value::Function(args, ret, *body));
+                env.define(
+                    name,
+                    Rc::new(RefCell::new(Value::Function(args, ret, *body))),
+                );
                 EvalValue::Value(Value::Void)
             }
             Expr(expr) => expr.eval(env),
@@ -129,7 +149,9 @@ impl Eval for Expr {
             Ident(name) => EvalValue::Value(
                 env.get(&name)
                     .ok_or_else(|| panic!("Something went wrong"))
-                    .unwrap(),
+                    .unwrap()
+                    .borrow_mut()
+                    .to_owned(),
             ), // TODO: handle error
             BinaryOp(bin) => bin.eval(env),
             UnaryOp(un) => un.eval(env),
@@ -137,13 +159,15 @@ impl Eval for Expr {
                 let func = env
                     .get(&name)
                     .ok_or_else(|| panic!("Something went wrong"))
-                    .unwrap(); // TODO: handle error
+                    .unwrap()
+                    .borrow_mut()
+                    .to_owned(); // TODO: handle error
                 match func {
                     Value::Function(params, _, body) => {
                         env.enter_scope();
                         for (param, arg) in params.iter().zip(args) {
                             let val = arg.eval(env).into_value();
-                            env.define(param.0.clone(), val);
+                            env.define(param.0.clone(), Rc::new(RefCell::new(val)));
                         }
 
                         let res = body.eval(env);
@@ -212,10 +236,28 @@ impl Eval for BinaryOp {
 impl Eval for UnaryOp {
     fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
         let Self(op, expr) = self;
-        let val = expr.eval(env).into_value();
 
         let res = match op {
-            Op::Not => Value::Boolean(!val.is_truthy()),
+            Op::Not => {
+                let val = expr.eval(env).into_value();
+                Value::Boolean(!val.is_truthy())
+            }
+            Op::AddressOf => match &expr.0 {
+                ExprKind::Ident(name) => {
+                    let pointer = env
+                        .get(&name)
+                        .unwrap_or_else(|| panic!("Undefined variable"));
+                    Value::Pointer(pointer)
+                }
+                _ => panic!("Address-of operator can only be applied to variables"),
+            },
+            Op::Deref => {
+                let val = expr.eval(env).into_value();
+                match val {
+                    Value::Pointer(ptr) => ptr.borrow().to_owned(),
+                    _ => panic!("Deref operator applied to a non-pointer value"),
+                }
+            }
             _ => unimplemented!(),
         };
 
@@ -241,7 +283,7 @@ pub fn eval_program(program: Program) -> Value {
     let mut env = EvalEnvironment::new();
     env.define(
         "print".to_string(),
-        Value::NativeFunction(NativeFunction(print)),
+        Rc::new(RefCell::new(Value::NativeFunction(NativeFunction(print)))),
     );
     program.eval(&mut env).into_value()
 }

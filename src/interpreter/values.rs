@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{cell::RefCell, fmt, rc::Rc};
 
 use crate::parser::ast::{Stmt, Type};
 
@@ -35,7 +35,7 @@ pub enum Value {
     String(String),
     Boolean(bool),
     Void,
-    Pointer(Box<Value>),
+    Pointer(Rc<RefCell<Value>>),
     Function(Vec<(String, Type)>, Type, Stmt),
     NativeFunction(NativeFunction),
 }
@@ -93,7 +93,7 @@ impl fmt::Display for Value {
             Value::String(val) => write!(f, "{}", val),
             Value::Boolean(val) => write!(f, "{}", val),
             Value::Void => write!(f, "void"),
-            Value::Pointer(val) => write!(f, "Pointer({})", *val),
+            Value::Pointer(val) => write!(f, "Pointer({})", val.borrow()),
             Value::Function(params, ret, _) => write!(
                 f,
                 "proc({}) -> {:?}",

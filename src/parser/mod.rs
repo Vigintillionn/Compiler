@@ -67,12 +67,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assign_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
-        let (name, tokens) = Self::parse_ident(tokens)?;
+        let (lhs, tokens) = parse_expr(tokens)?;
         let (_, tokens) = TokenKind::Assign.parse(tokens)?;
-        let (expr, tokens) = parse_expr(tokens)?;
+        let (rhs, tokens) = parse_expr(tokens)?;
         let (_, tokens) = TokenKind::Semi.parse(tokens)?;
 
-        Ok((Stmt::Assign(name, expr), tokens))
+        Ok((Stmt::Assign(lhs, rhs), tokens))
     }
 
     fn parse_if_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
@@ -123,13 +123,13 @@ impl<'a> Parser<'a> {
         let (cond, tokens) = opt(parse_expr)(tokens)?;
         let (_, tokens) = TokenKind::Semi.parse(tokens)?;
 
-        let (name, tokens) = opt(Self::parse_ident)(tokens)?;
-        let (update, tokens) = if name.is_some() {
+        let (lhs, tokens) = opt(parse_expr)(tokens)?;
+        let (update, tokens) = if lhs.is_some() {
             let (_, tokens) = TokenKind::Assign.parse(tokens)?;
-            let (update, tokens) = parse_expr(tokens)?;
+            let (rhs, tokens) = parse_expr(tokens)?;
 
             (
-                Some(Stmt::Assign(name.expect("Name is not some"), update)),
+                Some(Stmt::Assign(lhs.expect("Lhs is not some"), rhs)),
                 tokens,
             )
         } else {

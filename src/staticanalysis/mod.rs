@@ -1,6 +1,6 @@
 use crate::{
     environment::Environment,
-    parser::ast::{self, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type},
+    parser::ast::{self, Expr, ExprKind, LiteralValue, Op, Program, Stmt, Type, UnaryOp},
 };
 
 pub type TypeEnv = Environment<Type>;
@@ -85,6 +85,8 @@ impl TypeCheck for Expr {
                             return Err(format!("Type mismatch: {:?}", expr_type));
                         }
                     }
+                    AddressOf => Type::Pointer(Box::new(expr_type)),
+                    Deref => Type::Int, // TODO: Fix
                     _ => {
                         return Err(format!("Unsupported operator: {:?}", op));
                     }
@@ -108,15 +110,15 @@ impl TypeCheck for Expr {
                             ));
                         }
 
-                        for (arg, expected_type) in args.iter().zip(args_types.iter()) {
-                            let arg_type = arg.type_check(env, &None)?;
-                            if &arg_type != expected_type {
-                                return Err(format!(
-                                    "Type mismatch: expected {:?}, found {:?}",
-                                    expected_type, arg_type
-                                ));
-                            }
-                        }
+                        // for (arg, expected_type) in args.iter().zip(args_types.iter()) {
+                        //     let arg_type = arg.type_check(env, &None)?;
+                        //     if &arg_type != expected_type {
+                        //         return Err(format!(
+                        //             "Type mismatch: expected {:?}, found {:?}",
+                        //             expected_type, arg_type
+                        //         ));
+                        //     }
+                        // }
                         *self.1.borrow_mut() = Some(*ret_type.clone());
                         Ok(*ret_type.clone())
                     }
@@ -159,18 +161,28 @@ impl TypeCheck for Stmt {
                 env.define(name.clone(), expr_type.clone());
                 Ok(Type::Void)
             }
-            Assign(name, expr) => {
-                let expr_type = expr.type_check(env, expected)?;
-                if let Some(ty) = env.get(name) {
-                    if ty != expr_type {
-                        return Err(format!(
-                            "Type mismatch: expected {:?}, found {:?}",
-                            ty, expr_type
-                        ));
-                    }
-                } else {
-                    return Err(format!("Undefined variable: {}", name));
-                }
+            Assign(lhs, rhs) => {
+                let rhs_type = rhs.type_check(env, expected)?;
+                let name = match &lhs.0 {
+                    ExprKind::Ident(name) => name,
+                    ExprKind::UnaryOp(UnaryOp(Op::Deref, expr)) => match &(**expr).0 {
+                        ExprKind::Ident(name) => name,
+                        _ => panic!("Can't dereference this."),
+                    },
+                    _ => panic!("Can't assign to this."),
+                };
+
+                // TODO: Fix for assigning to pointers
+                // if let Some(ty) = env.get(name) {
+                //     if ty != rhs_type {
+                //         return Err(format!(
+                //             "Type mismatch: expected {:?}, found {:?}",
+                //             ty, rhs_type
+                //         ));
+                //     }
+                // } else {
+                //     return Err(format!("Undefined variable: {}", name));
+                // }
                 Ok(Type::Void)
             }
             If(cond, then_stmt, else_stmt) => {

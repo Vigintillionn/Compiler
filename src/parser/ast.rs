@@ -25,7 +25,7 @@ pub enum Stmt {
     Block(Block),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Var(String, Expr, RefCell<Option<Type>>),
-    Assign(String, Expr),
+    Assign(Expr, Expr),
     Loop(
         Option<Box<Stmt>>,
         Option<Expr>,
@@ -84,6 +84,7 @@ pub enum Op {
 
     Negate,
     Deref,
+    AddressOf,
 }
 
 impl From<&DisambiguatedOp> for Op {
@@ -115,6 +116,7 @@ impl From<&DisambiguatedOp> for Op {
             And => Self::And,
             Or => Self::Or,
             Bang => Self::Not,
+            Ampersand => Self::AddressOf,
             _ => panic!("This is not a valid operator! {:?}", op),
         }
     }
@@ -130,12 +132,28 @@ pub struct DisambiguatedOp {
 
 impl From<&Token> for DisambiguatedOp {
     fn from(token: &Token) -> Self {
-        let op_info = token.kind.op_info().unwrap();
-        DisambiguatedOp {
-            is_unary: op_info.is_unary,
-            prec: op_info.prec,
-            token: token.clone(),
-            assoc: op_info.assoc,
+        if matches!(
+            token,
+            Token {
+                kind: TokenKind::Identifier(_),
+                ..
+            }
+        ) {
+            DisambiguatedOp {
+                is_unary: true,
+                prec: 50,
+                token: token.clone(),
+                assoc: Assoc::Left,
+            }
+        } else {
+            println!("{:?}", token);
+            let op_info = token.kind.op_info().unwrap();
+            DisambiguatedOp {
+                is_unary: op_info.is_unary,
+                prec: op_info.prec,
+                token: token.clone(),
+                assoc: op_info.assoc,
+            }
         }
     }
 }
@@ -163,8 +181,9 @@ pub fn disambiguate(token: &Token, prev: Option<TokenKind>) -> DisambiguatedOp {
     } else {
         let prec = token.kind.op_info().unwrap().prec;
         let assoc = token.kind.op_info().unwrap().assoc;
+        let is_unary = token.kind.op_info().unwrap().is_unary;
         DisambiguatedOp {
-            is_unary: false,
+            is_unary,
             prec,
             assoc,
             token: token.clone(),

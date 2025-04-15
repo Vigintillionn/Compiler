@@ -139,7 +139,7 @@ impl<'a> Lexer<'a> {
                 if self.src.chars().nth(1) == Some('&') {
                     (TokenKind::And, 2)
                 } else {
-                    return Err(LexerError::InvalidCharacter(self.get_loc(), next));
+                    (TokenKind::Ampersand, 1)
                 }
             }
             '|' => {

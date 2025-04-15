@@ -8,11 +8,9 @@ pub type ParserResult<T> = Result<T, ParserError>;
 
 #[derive(Debug, Clone)]
 pub enum ParserError {
-    UnexpectedToken(usize, usize, usize),  // (line, column, index)
-    InvalidExpression(Token),              // (line, column, index)
-    InvalidStatement(usize, usize, usize), // (line, column, index)
-    MissingToken(Location, TokenKind),     // (line, column, index)
-    MismatchedParantheses(Token),          // (start, end)
+    InvalidExpression(Token),          // (line, column, index)
+    MissingToken(Location, TokenKind), // (line, column, index)
+    MismatchedParantheses(Token),      // (start, end)
     ExpectedIdentifier(Token),
     Other(String), // TODO: improve the locations here
 }
@@ -20,9 +18,7 @@ pub enum ParserError {
 impl ParserError {
     fn pos(&self) -> usize {
         match self {
-            ParserError::UnexpectedToken(_, _, pos) => *pos,
             ParserError::InvalidExpression(token) => token.pos,
-            ParserError::InvalidStatement(_, _, pos) => *pos,
             ParserError::MissingToken(location, _) => location.pos,
             ParserError::ExpectedIdentifier(token) => token.pos,
             ParserError::MismatchedParantheses(token) => token.pos,
@@ -34,10 +30,8 @@ impl ParserError {
         match self {
             ParserError::MissingToken(_, _) => 3,
             ParserError::InvalidExpression(_) => 2,
-            ParserError::InvalidStatement(_, _, _) => 2,
             ParserError::ExpectedIdentifier(_) => 2,
             ParserError::MismatchedParantheses(_) => 2,
-            ParserError::UnexpectedToken(_, _, _) => 1,
             ParserError::Other(_) => 0,
         }
     }
@@ -72,18 +66,12 @@ impl ParserError {
 impl fmt::Display for ParserError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ParserError::UnexpectedToken(line, col, _) => {
-                write!(f, "Unexpected token at line {}, column {}", line, col)
-            }
             ParserError::InvalidExpression(token) => {
                 write!(
                     f,
                     "Invalid expression at line {}, column {}",
                     token.line, token.col
                 )
-            }
-            ParserError::InvalidStatement(line, col, _) => {
-                write!(f, "Invalid statement at line {}, column {}", line, col)
             }
             ParserError::MissingToken(location, token_kind) => {
                 write!(
@@ -106,9 +94,7 @@ impl fmt::Display for ParserError {
 impl ReportableError for &ParserError {
     fn get_col_pos(&self) -> (usize, usize) {
         match self {
-            ParserError::UnexpectedToken(_, col, pos) => (*col, *pos),
             ParserError::InvalidExpression(token) => (token.col, token.pos),
-            ParserError::InvalidStatement(_, col, pos) => (*col, *pos),
             ParserError::MissingToken(location, _) => (location.col, location.pos),
             ParserError::ExpectedIdentifier(token) => (token.col, token.pos),
             ParserError::MismatchedParantheses(token) => (token.col, token.pos),

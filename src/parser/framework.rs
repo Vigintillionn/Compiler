@@ -385,27 +385,26 @@ where
     F: FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>,
 {
     move |input: &'a [Token]| {
-        let (_, rest) = TokenKind::OpenParen.parse(input)?;
+        let (open_paren, rest) = TokenKind::OpenParen.parse(input)?;
 
         let mut depth = 1;
-        let mut i = 0;
-        while i < rest.len() {
-            match rest[i].kind {
+        let mut close_idx = None;
+
+        for (idx, Token { kind, .. }) in rest.iter().enumerate() {
+            match kind {
                 TokenKind::OpenParen => depth += 1,
                 TokenKind::CloseParen => {
                     depth -= 1;
                     if depth == 0 {
+                        close_idx = Some(idx);
                         break;
                     }
                 }
                 _ => {}
             }
-            i += 1;
         }
 
-        if depth != 0 {
-            return Err(ParserError::MismatchedParantheses(rest[i].clone()));
-        }
+        let i = close_idx.ok_or(ParserError::MismatchedParantheses(open_paren))?;
 
         let inner_tokens = &rest[..i];
         let after = &rest[i + 1..];

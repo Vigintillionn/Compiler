@@ -172,17 +172,18 @@ impl TypeCheck for Stmt {
                     _ => panic!("Can't assign to this."),
                 };
 
-                // TODO: Fix for assigning to pointers
-                // if let Some(ty) = env.get(name) {
-                //     if ty != rhs_type {
-                //         return Err(format!(
-                //             "Type mismatch: expected {:?}, found {:?}",
-                //             ty, rhs_type
-                //         ));
-                //     }
-                // } else {
-                //     return Err(format!("Undefined variable: {}", name));
-                // }
+                if let Some(ty) = env.get(name) {
+                    let ty = if let Type::Pointer(ty) = ty { *ty } else { ty };
+
+                    if ty != rhs_type {
+                        return Err(format!(
+                            "Type mismatch: expected {:?}, found {:?}",
+                            ty, rhs_type
+                        ));
+                    }
+                } else {
+                    return Err(format!("Undefined variable: {}", name));
+                }
                 Ok(Type::Void)
             }
             If(cond, then_stmt, else_stmt) => {

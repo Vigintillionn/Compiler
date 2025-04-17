@@ -8,22 +8,14 @@ pub struct TypeChecked;
 pub struct CfChecked;
 
 #[derive(Debug)]
-pub struct UncheckedProgram {
+pub struct Program<Ph> {
     pub stmts: Block,
-    _phase: Unchecked,
+    _phase: Ph,
 }
 
-#[derive(Debug)]
-pub struct TypeCheckedProgram {
-    pub stmts: Block,
-    _phase: TypeChecked,
-}
-
-#[derive(Debug)]
-pub struct CfCheckedProgram {
-    pub stmts: Block,
-    _phase: CfChecked,
-}
+pub type UncheckedProgram = Program<Unchecked>;
+pub type TypeCheckedProgram = Program<TypeChecked>;
+pub type CfCheckedProgram = Program<CfChecked>;
 
 impl UncheckedProgram {
     pub fn new(stmts: Block) -> Self {

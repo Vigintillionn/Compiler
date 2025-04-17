@@ -2,23 +2,31 @@ use errors::report_error;
 use interpreter::eval_program;
 pub use lexer::{tokenize, tokens::Token};
 pub use parser::parse;
-use staticanalysis::type_check_program;
+use staticanalysis::{cf_check_program, type_check_program};
 
 mod environment;
 mod errors;
 mod interpreter;
 mod lexer;
 mod parser;
+pub mod program;
 mod sourcelines;
 mod staticanalysis;
 
 fn main() -> Result<(), String> {
     let code = "
         proc a(b: &int) -> int {
-            var c = 10;
-            var d = 20;
-            *b = c + d;
-            ret *b + d;
+            if(true) {
+                *b = 2;
+                ret 1;
+            } else {
+
+                var c = 10;
+                var d = 20;
+                *b = c + d;
+                
+            }
+            ret *b;
         }
 
         var x: int = 0;
@@ -51,7 +59,9 @@ fn main() -> Result<(), String> {
         return Err("Failed to parse".to_string());
     };
 
-    type_check_program(&ast)?;
+    let ast = type_check_program(ast)?;
+    let ast = cf_check_program(ast)?;
+
     eval_program(ast);
 
     Ok(())

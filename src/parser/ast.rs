@@ -4,10 +4,7 @@ use crate::{
 };
 use std::cell::RefCell;
 
-type Block = Vec<Stmt>;
-
-#[derive(Debug)]
-pub struct Program(pub Block);
+pub type Block = Vec<Stmt>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
@@ -147,7 +144,6 @@ impl From<&Token> for DisambiguatedOp {
                 assoc: Assoc::Left,
             }
         } else {
-            println!("{:?}", token);
             let op_info = token.kind.op_info().unwrap();
             DisambiguatedOp {
                 is_unary: op_info.is_unary,

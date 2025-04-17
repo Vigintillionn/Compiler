@@ -2,7 +2,8 @@ use nativefunctions::print;
 
 use crate::{
     environment::Environment,
-    parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Program, Stmt, UnaryOp},
+    parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Stmt, UnaryOp},
+    program::CfCheckedProgram,
 };
 use core::panic;
 use std::{cell::RefCell, rc::Rc};
@@ -17,10 +18,10 @@ trait Eval {
     fn eval(self, env: &mut EvalEnvironment) -> EvalValue;
 }
 
-impl Eval for Program {
+impl Eval for CfCheckedProgram {
     #[allow(clippy::double_ended_iterator_last)]
     fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
-        self.0
+        self.stmts
             .into_iter()
             .map(|stmt| stmt.eval(env))
             .last()
@@ -279,7 +280,7 @@ impl Eval for LiteralValue {
     }
 }
 
-pub fn eval_program(program: Program) -> Value {
+pub fn eval_program(program: CfCheckedProgram) -> Value {
     let mut env = EvalEnvironment::new();
     env.define(
         "print".to_string(),

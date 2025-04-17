@@ -22,8 +22,6 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
         .ok_or(ParserError::Other("Empty expression".to_string()))?;
 
     while let Some(token) = tokens.first() {
-        println!("Output: {:?}", output);
-        println!("Op stack: {:?}", op_stack);
         match token.kind {
             IntLiteral(n) => output.push(Expr(
                 ExprKind::Literal(LiteralValue::Integer(n)),

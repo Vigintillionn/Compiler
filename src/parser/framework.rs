@@ -377,3 +377,40 @@ where
         Ok((results, rest))
     }
 }
+
+pub fn balanced_parens<'a, F, T>(
+    mut inner: F,
+) -> impl FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>
+where
+    F: FnMut(&'a [Token]) -> ParserResult<(T, &'a [Token])>,
+{
+    move |input: &'a [Token]| {
+        let (_, rest) = TokenKind::OpenParen.parse(input)?;
+
+        let mut depth = 1;
+        let mut i = 0;
+        while i < rest.len() {
+            match rest[i].kind {
+                TokenKind::OpenParen => depth += 1,
+                TokenKind::CloseParen => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+
+        if depth != 0 {
+            return Err(ParserError::MismatchedParantheses(rest[i].clone()));
+        }
+
+        let inner_tokens = &rest[..i];
+        let after = &rest[i + 1..];
+
+        let (expr, _) = inner(inner_tokens)?;
+        Ok((expr, after))
+    }
+}

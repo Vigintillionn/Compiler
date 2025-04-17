@@ -1,12 +1,14 @@
 use crate::{
     errors::parser::{ParserError, ParserResult},
     lexer::tokens::TokenKind,
+    program::UncheckedProgram,
     Token,
 };
-use ast::{Program, Stmt, Type};
+use ast::{Stmt, Type};
 use expressions::parse_expr;
 use framework::{
-    alt, delimited, many, map, opt, preceded, seperated_list, terminated, Parser as ParserTrait,
+    alt, balanced_parens, delimited, many, map, opt, preceded, seperated_list, terminated,
+    Parser as ParserTrait,
 };
 use std::cell::RefCell;
 
@@ -77,8 +79,9 @@ impl<'a> Parser<'a> {
 
     fn parse_if_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (_, tokens) = TokenKind::If.parse(tokens)?;
-        let (cond, tokens) =
-            delimited(TokenKind::OpenParen, parse_expr, TokenKind::CloseParen)(tokens)?;
+        // let (cond, tokens) =
+        //     delimited(TokenKind::OpenParen, parse_expr, TokenKind::CloseParen)(tokens)?;
+        let (cond, tokens) = balanced_parens(parse_expr)(tokens)?;
         let (then_block, tokens) = Self::parse_block(tokens)?;
         let (has_else, tokens) = opt(TokenKind::Else)(tokens)?;
         let (else_block, tokens) = if has_else.is_some() {
@@ -280,7 +283,7 @@ impl Iterator for Parser<'_> {
     }
 }
 
-pub fn parse(tokens: &[Token]) -> Result<Program, Vec<ParserError>> {
+pub fn parse(tokens: &[Token]) -> Result<UncheckedProgram, Vec<ParserError>> {
     let parser = Parser::new(tokens);
     let mut stmts = Vec::new();
     let mut errors = Vec::new();
@@ -292,7 +295,7 @@ pub fn parse(tokens: &[Token]) -> Result<Program, Vec<ParserError>> {
         }
     }
     if errors.is_empty() {
-        Ok(Program(stmts))
+        Ok(UncheckedProgram::new(stmts))
     } else {
         Err(errors)
     }

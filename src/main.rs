@@ -29,44 +29,30 @@ fn main() -> Result<(), String> {
     let tokens = tokenize(code);
     let source_lines = sourcelines::SourceLines::new(code);
 
-    if let Ok(tokens) = tokens {
-        let ast = parse(tokens.as_slice());
-        println!("{:#?}", ast);
-        if let Ok(ast) = ast {
-            type_check_program(&ast)?;
-            println!("{:#?}", ast);
-            eval_program(ast);
-        } else {
-            let errors = ast.unwrap_err();
-            errors
-                .iter()
-                .for_each(|e| report_error(e, code, &source_lines));
-            // for err in &errors {
-            //   match err {
-            //     ParserError::ExpectedIdentifier(tok) => {
-            //       // println!("Expected identifier at line {}:{}: {}", line, col, pos);
-            //       let pos = tok.pos;
-            //       let col = tok.col;
-            //       let line_idx = source_lines.find_line(pos);
-            //       let (line_start, line_end) = source_lines.line_range(line_idx);
-            //       let line_src = &code[line_start..line_end];
-            //       let len = tok.kind.len();
-
-            //       eprintln!("\x1b[93mError\x1b[0m at line {}:{}: expected identifier", line_idx + 1, col);
-            //       eprintln!("{:4} | {}", line_idx + 1, line_src.trim_end());
-            //       eprintln!("     | {:>width$}{}", "", "^".repeat(len), width = col-1);
-            //     },
-            //     _ => unimplemented!()
-            //   }
-            // }
-        }
-    } else {
+    let Ok(tokens) = tokens else {
         let errors = tokens.unwrap_err();
         errors
             .iter()
             .for_each(|e| report_error(e, code, &source_lines));
         eprintln!("Found {} errors", errors.len());
-    }
+
+        return Err("Failed to tokenize".to_string());
+    };
+
+    let ast = parse(&tokens);
+
+    let Ok(ast) = ast else {
+        let errors = ast.unwrap_err();
+        errors
+            .iter()
+            .for_each(|e| report_error(e, code, &source_lines));
+        eprintln!("Found {} errors", errors.len());
+
+        return Err("Failed to parse".to_string());
+    };
+
+    type_check_program(&ast)?;
+    eval_program(ast);
 
     Ok(())
 }

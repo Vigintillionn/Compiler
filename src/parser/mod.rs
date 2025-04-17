@@ -224,7 +224,7 @@ impl<'a> Parser<'a> {
             let (_, tokens) = TokenKind::Arrow.parse(tokens)?;
             let (ret_ty, tokens) = Self::parse_type(tokens)?;
 
-            Ok((Type::Function(args, Box::new(ret_ty)), tokens))
+            Ok((Type::Function(args, Box::new(ret_ty), false), tokens))
         };
 
         let (ty, tokens) = alt((

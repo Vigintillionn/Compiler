@@ -23,8 +23,7 @@ fn main() -> Result<(), String> {
 
         var x: int = 0;
         var y: int = a(&x);
-        print(x);
-        print(y);
+        print(x, y);
     ";
 
     let tokens = tokenize(code);

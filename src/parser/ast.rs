@@ -15,9 +15,10 @@ pub enum Type {
     Float,
     String,
     Boolean,
-    Function(Vec<Type>, Box<Type>),
+    Function(Vec<Type>, Box<Type>, bool), // bool indicates if it has variadic arguments
     Void,
     Pointer(Box<Type>),
+    Any,
 }
 
 #[derive(Debug, Clone)]

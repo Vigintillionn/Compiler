@@ -100,8 +100,8 @@ impl TypeCheck for Expr {
                     None => return Err(format!("Undefined function: {}", name)),
                 };
                 match func_type.clone() {
-                    Type::Function(args_types, ret_type) => {
-                        if args.len() != args_types.len() {
+                    Type::Function(args_types, ret_type, variadic) => {
+                        if args.len() != args_types.len() && !variadic {
                             return Err(format!(
                                 "Function {} expects {} arguments, found {}",
                                 name,
@@ -110,15 +110,30 @@ impl TypeCheck for Expr {
                             ));
                         }
 
-                        // for (arg, expected_type) in args.iter().zip(args_types.iter()) {
-                        //     let arg_type = arg.type_check(env, &None)?;
-                        //     if &arg_type != expected_type {
-                        //         return Err(format!(
-                        //             "Type mismatch: expected {:?}, found {:?}",
-                        //             expected_type, arg_type
-                        //         ));
-                        //     }
-                        // }
+                        for (arg, expected_type) in args.iter().zip(args_types.iter()) {
+                            let arg_type = arg.type_check(env, &None)?;
+                            if &arg_type != expected_type && expected_type != &Type::Any {
+                                return Err(format!(
+                                    "Type mismatch: expected {:?}, found {:?}",
+                                    expected_type, arg_type
+                                ));
+                            }
+                        }
+
+                        // If the function is variadic, check if the passed arguments, past the required types are of the same type as the last specified type
+                        if variadic && args.len() > args_types.len() {
+                            let last_type = args_types.last().unwrap();
+                            for arg in &args[args_types.len()..] {
+                                let arg_type = arg.type_check(env, &None)?;
+                                if &arg_type != last_type && last_type != &Type::Any {
+                                    return Err(format!(
+                                        "Type mismatch: expected {:?}, found {:?}",
+                                        last_type, arg_type
+                                    ));
+                                }
+                            }
+                        }
+
                         *self.1.borrow_mut() = Some(*ret_type.clone());
                         Ok(*ret_type.clone())
                     }
@@ -240,7 +255,8 @@ impl TypeCheck for Stmt {
             }
             Function(name, args, ret_type, body) => {
                 let arg_types = args.iter().map(|(_, ty)| ty.clone()).collect::<Vec<_>>();
-                let func_type = Type::Function(arg_types.clone(), Box::new(ret_type.clone()));
+                let func_type =
+                    Type::Function(arg_types.clone(), Box::new(ret_type.clone()), false);
 
                 env.define(name.clone(), func_type.clone());
                 env.enter_scope();
@@ -262,7 +278,7 @@ pub fn type_check_program(program: &Program) -> Result<(), String> {
     let mut env = TypeEnv::new();
     env.define(
         "print".to_string(),
-        Type::Function(vec![Type::Int], Box::new(Type::Void)),
+        Type::Function(vec![Type::Any], Box::new(Type::Void), true),
     );
     for stmt in &program.0 {
         stmt.type_check(&mut env, &None)?;

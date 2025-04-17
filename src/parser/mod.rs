@@ -232,7 +232,7 @@ impl<'a> Parser<'a> {
             map(TokenKind::Bool, |_| Type::Boolean),
             map(TokenKind::Float, |_| Type::Float),
             map(TokenKind::Str, |_| Type::String),
-            map(preceded(TokenKind::Asterisk, Self::parse_type), |ty| {
+            map(preceded(TokenKind::Ampersand, Self::parse_type), |ty| {
                 Type::Pointer(Box::new(ty))
             }),
             parse_f_type,

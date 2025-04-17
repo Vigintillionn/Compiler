@@ -13,52 +13,18 @@ mod sourcelines;
 mod staticanalysis;
 
 fn main() -> Result<(), String> {
-    // let code: &str = "proc fib(n: int) -> int {
-    //     var a: int = 0;
-    //     for (var i = 0; i < n; i = i + 1) {
-    //     if (i == 4) {
-    //       break;
-    //     }
-    //       a = a + i;
-    //     }
-    //     ret a;
-    //   }
-
-    //   var 6 = 10;
-
-    //   print(fib(10));
-    // ";
-    // let code = "
-    // proc fib(n: int) -> int {
-    //     var a: int = 0;
-    //     for (var i = 0; i < n; i = i + 1) {
-    //         if (i == 4) {
-    //             break;
-    //         }
-    //         a = a + i;
-    //     }
-    //     ret a;
-    // }
-
-    // var x: int = 6;
-    // var y: int = 10;
-    // var z: int = 0;
-    // z = fib(x + y);
-    // print(z);
-    // ";
-
     let code = "
-        proc a(x: int, y: int) -> int {
-            print(y);
-            ret x + 1;
+        proc a(b: &int) -> int {
+            var c = 10;
+            var d = 20;
+            *b = c + d;
+            ret *b + d;
         }
 
-        var b = a(5, 7);
-        var c = 10;
-        var d = b + c;
-
-        print(b);
-
+        var x: int = 0;
+        var y: int = a(&x);
+        print(x);
+        print(y);
     ";
 
     let tokens = tokenize(code);

@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use crate::parser::ast::Block;
 
 #[derive(Debug)]

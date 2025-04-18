@@ -2,7 +2,7 @@ use nativefunctions::print;
 
 use crate::{
     environment::Environment,
-    parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Stmt, UnaryOp},
+    parser::ast::{BinaryOp, Expr, ExprKind, LiteralValue, Op, Stmt, StmtKind, UnaryOp},
     program::CfCheckedProgram,
 };
 use core::panic;
@@ -31,8 +31,8 @@ impl Eval for CfCheckedProgram {
 
 impl Eval for Stmt {
     fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
-        use Stmt::*;
-        match self {
+        use StmtKind::*;
+        match self.node {
             Block(stmts) => {
                 env.enter_scope();
                 let mut result = EvalValue::Value(Value::Void);
@@ -53,7 +53,7 @@ impl Eval for Stmt {
             Assign(lhs, rhs) => {
                 let val = rhs.eval(env).into_value();
 
-                match &lhs.0 {
+                match &lhs.node.0 {
                     ExprKind::Ident(ref name) => {
                         env.assign(&name, Rc::new(RefCell::new(val.clone())))
                             .unwrap_or_else(|err| panic!("{}", err));
@@ -113,7 +113,7 @@ impl Eval for Stmt {
                         }
                     }
 
-                    if let Stmt::Block(ref block) = *block {
+                    if let StmtKind::Block(ref block) = (*block).node {
                         for stmt in block.clone() {
                             result = stmt.eval(env);
                             if matches!(result, EvalValue::Return(_) | EvalValue::Break) {
@@ -145,7 +145,7 @@ impl Eval for Stmt {
 impl Eval for Expr {
     fn eval(self, env: &mut EvalEnvironment) -> EvalValue {
         use ExprKind::*;
-        match self.0 {
+        match self.node.0 {
             Literal(value) => value.eval(env),
             Ident(name) => EvalValue::Value(
                 env.get(&name)
@@ -243,7 +243,7 @@ impl Eval for UnaryOp {
                 let val = expr.eval(env).into_value();
                 Value::Boolean(!val.is_truthy())
             }
-            Op::AddressOf => match &expr.0 {
+            Op::AddressOf => match &expr.node.0 {
                 ExprKind::Ident(name) => {
                     let pointer = env
                         .get(&name)

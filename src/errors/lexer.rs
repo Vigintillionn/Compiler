@@ -1,78 +1,43 @@
 use std::fmt;
 
-use super::{Location, ReportableError};
+use super::{ReportableError, Span};
 
 pub type LexerResult<T> = Result<T, LexerError>;
 
 #[derive(Debug, Clone)]
 pub enum LexerError {
-    InvalidCharacter(Location, char),
-    UnterminatedString(Location),
-    InvalidNumber(Location, String),
-    UnexpectedEOF(Location),
-    Other(Location, String),
+    InvalidCharacter(char, Span),
+    InvalidNumber(String, Span),
+    UnexpectedEOF(Span),
+    Other(String, Span),
 }
 
 impl fmt::Display for LexerError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            LexerError::InvalidCharacter(location, found) => {
-                write!(
-                    f,
-                    "Invalid character '{}' at line {}:{}",
-                    found, location.line, location.col
-                )
+            LexerError::InvalidCharacter(c, _) => {
+                write!(f, "Invalid character '{}'", c)
             }
-            LexerError::UnterminatedString(location) => {
-                write!(
-                    f,
-                    "Unterminated string at line {}:{}",
-                    location.line, location.col
-                )
+            LexerError::InvalidNumber(num, _) => {
+                write!(f, "Invalid number '{}'", num)
             }
-            LexerError::InvalidNumber(location, number) => {
-                write!(
-                    f,
-                    "Invalid number '{}' at line {}:{}",
-                    number, location.line, location.col
-                )
+            LexerError::UnexpectedEOF(_) => {
+                write!(f, "Unexpected end of file")
             }
-            LexerError::UnexpectedEOF(location) => {
-                write!(
-                    f,
-                    "Unexpected EOF at line {}:{}",
-                    location.line, location.col
-                )
-            }
-            LexerError::Other(location, msg) => {
-                write!(
-                    f,
-                    "Error at line {}:{}: {}",
-                    location.line, location.col, msg
-                )
+            LexerError::Other(msg, _) => {
+                write!(f, "Lexer error: {}", msg)
             }
         }
     }
 }
 
 impl ReportableError for &LexerError {
-    fn get_col_pos(&self) -> (usize, usize) {
+    fn get_span(&self) -> &Span {
         match self {
-            LexerError::InvalidCharacter(location, _) => (location.col, location.pos),
-            LexerError::UnterminatedString(location) => (location.col, location.pos),
-            LexerError::InvalidNumber(location, _) => (location.col, location.pos),
-            LexerError::UnexpectedEOF(location) => (location.col, location.pos),
-            LexerError::Other(location, _) => (location.col, location.pos),
-        }
-    }
-
-    fn len(&self) -> usize {
-        match self {
-            LexerError::InvalidCharacter(_, _) => 1,
-            LexerError::UnterminatedString(_) => 1,
-            LexerError::InvalidNumber(_, _) => 1,
-            LexerError::UnexpectedEOF(_) => 1,
-            LexerError::Other(_, msg) => msg.len(),
+            LexerError::InvalidCharacter(_, span) => span,
+            LexerError::InvalidNumber(_, span) => span,
+            LexerError::UnexpectedEOF(span) => span,
+            LexerError::Other(_, span) => span,
         }
     }
 }

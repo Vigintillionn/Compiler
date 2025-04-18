@@ -1,9 +1,14 @@
 use std::cell::RefCell;
 
 use crate::{
-    errors::parser::{ParserError, ParserResult},
+    errors::{
+        parser::{ParserError, ParserResult},
+        Span,
+    },
     lexer::tokens::TokenKind,
-    parser::ast::{disambiguate, BinaryOp, DisambiguatedOp, ExprKind, LiteralValue, Type},
+    parser::ast::{
+        disambiguate, BinaryOp, DisambiguatedOp, ExprInner, ExprKind, LiteralValue, Type,
+    },
     Token,
 };
 
@@ -17,31 +22,45 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
     let mut arg_stack: Vec<usize> = Vec::new();
     let mut prev_token = None;
 
-    let first_tok = tokens
-        .first()
-        .ok_or(ParserError::Other("Empty expression".to_string()))?;
+    let first_tok = tokens.first().ok_or(ParserError::Other(
+        "Empty expression".to_string(),
+        Span::new(0, 0), // TODO: fix this
+    ))?;
 
     while let Some(token) = tokens.first() {
+        let span = token.span;
         match token.kind {
-            IntLiteral(n) => output.push(Expr(
-                ExprKind::Literal(LiteralValue::Integer(n)),
-                RefCell::new(Some(Type::Int)),
-            )), // TODO: Handle typing
-            FloatLiteral(f) => output.push(Expr(
-                ExprKind::Literal(LiteralValue::Float(f)),
-                RefCell::new(Some(Type::Float)),
-            )), // TODO: Handle typing
-            BoolLiteral(b) => output.push(Expr(
-                ExprKind::Literal(LiteralValue::Boolean(b)),
-                RefCell::new(Some(Type::Boolean)),
-            )),
+            IntLiteral(n) => output.push(Expr {
+                node: ExprInner(
+                    ExprKind::Literal(LiteralValue::Integer(n)),
+                    RefCell::new(Some(Type::Int)),
+                ),
+                span,
+            }), // TODO: Handle typing
+            FloatLiteral(f) => output.push(Expr {
+                node: ExprInner(
+                    ExprKind::Literal(LiteralValue::Float(f)),
+                    RefCell::new(Some(Type::Float)),
+                ),
+                span,
+            }), // TODO: Handle typing
+            BoolLiteral(b) => output.push(Expr {
+                node: ExprInner(
+                    ExprKind::Literal(LiteralValue::Boolean(b)),
+                    RefCell::new(Some(Type::Boolean)),
+                ),
+                span,
+            }),
             Identifier(ref id) => {
                 if tokens.len() > 1 && tokens[1].kind == TokenKind::OpenParen {
                     // Function call
                     op_stack.push(token.into());
                     arg_stack.push(0);
                 } else {
-                    output.push(Expr(ExprKind::Ident(id.clone()), RefCell::new(None)));
+                    output.push(Expr {
+                        node: ExprInner(ExprKind::Ident(id.clone()), RefCell::new(None)),
+                        span,
+                    });
                 }
             }
             OpenParen => op_stack.push(token.into()),
@@ -59,7 +78,10 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                     if let Some(ref op) = op_stack.pop() {
                         handle_operator(op, &mut output)?;
                     } else {
-                        return Err(ParserError::MismatchedParantheses(token.clone()));
+                        return Err(ParserError::MismatchedParantheses(Span::new(
+                            first_tok.span.start,
+                            op_stack.last().unwrap().token.span.end,
+                        )));
                     }
                 }
 
@@ -74,9 +96,10 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                         ..
                     })
                 ) {
-                    return Err(ParserError::MismatchedParantheses(
-                        op_stack.last().unwrap().token.clone(),
-                    ));
+                    return Err(ParserError::MismatchedParantheses(Span::new(
+                        first_tok.span.start,
+                        op_stack.last().unwrap().token.span.end,
+                    )));
                 }
                 op_stack.pop();
 
@@ -99,14 +122,21 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                         ..
                     }) = op_stack.pop()
                     else {
-                        return Err(ParserError::InvalidExpression(token.clone()));
+                        return Err(ParserError::InvalidExpression(
+                            output
+                                .last()
+                                .map_or(token.clone().span, |expr| expr.span.clone()), // TODO: fix token.clone() part
+                        ));
                     };
                     let args = output.split_off(
                         output
                             .len()
                             .saturating_sub(arg_stack.pop().unwrap_or(0) + 1),
                     );
-                    output.push(Expr(ExprKind::Call(name.clone(), args), RefCell::new(None)));
+                    output.push(Expr {
+                        node: ExprInner(ExprKind::Call(name.clone(), args), RefCell::new(None)),
+                        span: token.span, // TODO: is this the right span?
+                    });
                 }
             }
             Comma => {
@@ -171,7 +201,10 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
 
     while let Some(op) = op_stack.pop() {
         if matches!(op.token.kind, TokenKind::OpenParen) {
-            return Err(ParserError::MismatchedParantheses(op.token.clone()));
+            return Err(ParserError::MismatchedParantheses(Span::new(
+                first_tok.span.start,
+                op.token.span.end,
+            )));
         }
 
         handle_operator(&op, &mut output)?;
@@ -180,7 +213,11 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
     if output.len() == 1 {
         Ok((output.pop().unwrap(), tokens))
     } else {
-        Err(ParserError::InvalidExpression(first_tok.clone())) // TODO ERROR
+        let start = first_tok.span.start;
+        let end = tokens.last().map_or(first_tok.span.end, |t| t.span.end);
+        let span = Span::new(start, end);
+
+        Err(ParserError::InvalidExpression(span)) // TODO ERROR
     }
 }
 
@@ -194,13 +231,22 @@ fn handle_operator(op: &DisambiguatedOp, output: &mut Vec<Expr>) -> Result<(), P
 
 fn handle_unary_operator(op: &DisambiguatedOp, output: &mut Vec<Expr>) -> Result<(), ParserError> {
     if !op.is_unary {
-        return Err(ParserError::Other("Expected unary operator".to_string()));
+        return Err(ParserError::Other(
+            "Expected unary operator".to_string(),
+            op.token.span,
+        ));
     }
     let operand = output.pop().unwrap();
-    let expr = Expr(
-        ExprKind::UnaryOp(UnaryOp(op.into(), Box::new(operand))),
-        RefCell::new(None),
-    );
+
+    let span = Span::new(op.token.span.start, operand.span.end);
+
+    let expr = Expr {
+        node: ExprInner(
+            ExprKind::UnaryOp(UnaryOp(op.into(), Box::new(operand))),
+            RefCell::new(None),
+        ),
+        span,
+    };
     output.push(expr);
 
     Ok(())
@@ -208,14 +254,22 @@ fn handle_unary_operator(op: &DisambiguatedOp, output: &mut Vec<Expr>) -> Result
 
 fn handle_binary_operator(op: &DisambiguatedOp, output: &mut Vec<Expr>) -> Result<(), ParserError> {
     if op.is_unary {
-        return Err(ParserError::Other("Expected binary operator".to_string()));
+        return Err(ParserError::Other(
+            "Expected binary operator".to_string(),
+            op.token.span,
+        ));
     }
     let rhs = output.pop().unwrap();
     let lhs = output.pop().unwrap();
-    let expr = Expr(
-        ExprKind::BinaryOp(BinaryOp(Box::new(lhs), op.into(), Box::new(rhs))),
-        RefCell::new(None),
-    );
+
+    let span = Span::new(lhs.span.start, rhs.span.end);
+    let expr = Expr {
+        node: ExprInner(
+            ExprKind::BinaryOp(BinaryOp(Box::new(lhs), op.into(), Box::new(rhs))),
+            RefCell::new(None),
+        ),
+        span,
+    };
     output.push(expr);
 
     Ok(())

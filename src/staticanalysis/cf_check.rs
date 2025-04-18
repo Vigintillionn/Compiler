@@ -1,5 +1,5 @@
 use crate::{
-    parser::ast::{Stmt, Type},
+    parser::ast::{Stmt, StmtKind, Type},
     program::TypeCheckedProgram,
 };
 
@@ -45,8 +45,8 @@ impl FlowCheck for TypeCheckedProgram {
 
 impl FlowCheck for Stmt {
     fn flow_check(&self) -> Result<FlowInfo, String> {
-        use Stmt::*;
-        match self {
+        use StmtKind::*;
+        match &self.node {
             Block(stmts) => {
                 let mut info = FlowInfo::default();
 

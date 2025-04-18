@@ -10,38 +10,22 @@ mod interpreter;
 mod lexer;
 mod parser;
 pub mod program;
-mod sourcelines;
+mod sourcemap;
 mod staticanalysis;
 
 fn main() -> Result<(), String> {
     let code = "
-        proc a(b: &int) -> int {
-            if(true) {
-                *b = 2;
-                ret 1;
-            } else {
-
-                var c = 10;
-                var d = 20;
-                *b = c + d;
-                
-            }
-            ret *b;
+        if (a) {
+        
         }
-
-        var x: int = 0;
-        var y: int = a(&x);
-        print(x, y);
     ";
 
     let tokens = tokenize(code);
-    let source_lines = sourcelines::SourceLines::new(code);
+    let source_map = sourcemap::SourceMap::new(code);
 
     let Ok(tokens) = tokens else {
         let errors = tokens.unwrap_err();
-        errors
-            .iter()
-            .for_each(|e| report_error(e, code, &source_lines));
+        errors.iter().for_each(|e| report_error(e, &source_map));
         eprintln!("Found {} errors", errors.len());
 
         return Err("Failed to tokenize".to_string());
@@ -51,9 +35,7 @@ fn main() -> Result<(), String> {
 
     let Ok(ast) = ast else {
         let errors = ast.unwrap_err();
-        errors
-            .iter()
-            .for_each(|e| report_error(e, code, &source_lines));
+        errors.iter().for_each(|e| report_error(e, &source_map));
         eprintln!("Found {} errors", errors.len());
 
         return Err("Failed to parse".to_string());

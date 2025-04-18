@@ -1,4 +1,5 @@
 use crate::{
+    errors::Spanned,
     lexer::tokens::{Assoc, TokenKind},
     Token,
 };
@@ -18,8 +19,10 @@ pub enum Type {
     Any,
 }
 
+pub type Stmt = Spanned<StmtKind>;
+
 #[derive(Debug, Clone)]
-pub enum Stmt {
+pub enum StmtKind {
     Block(Block),
     If(Expr, Box<Stmt>, Option<Box<Stmt>>),
     Var(String, Expr, RefCell<Option<Type>>),
@@ -45,8 +48,10 @@ pub enum LiteralValue {
     Boolean(bool),
 }
 
+pub type Expr = Spanned<ExprInner>;
+
 #[derive(Debug, Clone)]
-pub struct Expr(pub ExprKind, pub RefCell<Option<Type>>);
+pub struct ExprInner(pub ExprKind, pub RefCell<Option<Type>>);
 
 #[derive(Debug, Clone)]
 pub enum ExprKind {

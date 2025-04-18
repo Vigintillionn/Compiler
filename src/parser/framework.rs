@@ -2,7 +2,7 @@
 use crate::{
     errors::{
         parser::{ParserError, ParserResult},
-        Location,
+        Span,
     },
     lexer::tokens::{Token, TokenKind},
 };
@@ -81,13 +81,10 @@ impl<'a> Parser<'a, Token> for TokenKind {
             if *self == first.kind {
                 return Ok(((*first).clone(), rest));
             } else {
-                return Err(ParserError::MissingToken(
-                    Location::from(first),
-                    self.clone(),
-                ));
+                return Err(ParserError::MissingToken(self.clone(), first.span));
             }
         }
-        Err(ParserError::Other("".to_string())) // TODO: Handle this case properly
+        Err(ParserError::Other("".to_string(), Span::new(0, 0))) // TODO: Handle this case properly
     }
 }
 
@@ -404,7 +401,13 @@ where
             }
         }
 
-        let i = close_idx.ok_or(ParserError::MismatchedParantheses(open_paren))?;
+        let span = Span::new(
+            open_paren.span.start,
+            rest.get(close_idx.unwrap_or(rest.len() - 1))
+                .map_or(rest.len(), |t| t.span.end),
+        );
+
+        let i = close_idx.ok_or(ParserError::MismatchedParantheses(span))?;
 
         let inner_tokens = &rest[..i];
         let after = &rest[i + 1..];

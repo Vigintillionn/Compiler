@@ -1,6 +1,6 @@
 use crate::{
     environment::Environment,
-    parser::ast::{self, Expr, ExprKind, LiteralValue, Op, Stmt, Type, UnaryOp},
+    parser::ast::{self, Expr, ExprKind, LiteralValue, Op, Stmt, StmtKind, Type, UnaryOp},
     program::UncheckedProgram,
 };
 
@@ -13,7 +13,7 @@ pub trait TypeCheck {
 impl TypeCheck for Expr {
     fn type_check(&self, env: &mut TypeEnv, _: &Option<Type>) -> Result<Type, String> {
         use ExprKind::*;
-        match &self.0 {
+        match &self.node.0 {
             Literal(val) => match val {
                 LiteralValue::Integer(_) => Ok(Type::Int),
                 LiteralValue::Float(_) => Ok(Type::Float),
@@ -22,7 +22,7 @@ impl TypeCheck for Expr {
             },
             Ident(ref id) => {
                 if let Some(ty) = env.get(id) {
-                    *self.1.borrow_mut() = Some(ty.clone());
+                    *self.node.1.borrow_mut() = Some(ty.clone());
                     Ok(ty.clone())
                 } else {
                     Err(format!("Undefined variable: {}", id))
@@ -72,7 +72,7 @@ impl TypeCheck for Expr {
                         return Err(format!("Unsupported operator: {:?}", op));
                     }
                 };
-                *self.1.borrow_mut() = Some(res.clone());
+                *self.node.1.borrow_mut() = Some(res.clone());
                 Ok(res)
             }
             UnaryOp(ast::UnaryOp(op, expr)) => {
@@ -92,7 +92,7 @@ impl TypeCheck for Expr {
                         return Err(format!("Unsupported operator: {:?}", op));
                     }
                 };
-                *self.1.borrow_mut() = Some(res.clone());
+                *self.node.1.borrow_mut() = Some(res.clone());
                 Ok(res)
             }
             Call(name, args) => {
@@ -135,7 +135,7 @@ impl TypeCheck for Expr {
                             }
                         }
 
-                        *self.1.borrow_mut() = Some(*ret_type.clone());
+                        *self.node.1.borrow_mut() = Some(*ret_type.clone());
                         Ok(*ret_type.clone())
                     }
                     _ => {
@@ -149,8 +149,8 @@ impl TypeCheck for Expr {
 
 impl TypeCheck for Stmt {
     fn type_check(&self, env: &mut TypeEnv, expected: &Option<Type>) -> Result<Type, String> {
-        use Stmt::*;
-        match self {
+        use StmtKind::*;
+        match &self.node {
             Block(stmts) => {
                 env.enter_scope();
                 for stmt in stmts {
@@ -179,9 +179,9 @@ impl TypeCheck for Stmt {
             }
             Assign(lhs, rhs) => {
                 let rhs_type = rhs.type_check(env, expected)?;
-                let name = match &lhs.0 {
+                let name = match &lhs.node.0 {
                     ExprKind::Ident(name) => name,
-                    ExprKind::UnaryOp(UnaryOp(Op::Deref, expr)) => match &(**expr).0 {
+                    ExprKind::UnaryOp(UnaryOp(Op::Deref, expr)) => match &(**expr).node.0 {
                         ExprKind::Ident(name) => name,
                         _ => panic!("Can't dereference this."),
                     },
@@ -215,7 +215,7 @@ impl TypeCheck for Stmt {
             }
             Expr(expr) => {
                 let ty = expr.type_check(env, expected)?;
-                *expr.1.borrow_mut() = Some(ty.clone());
+                *expr.node.1.borrow_mut() = Some(ty.clone());
                 Ok(ty)
             }
             Loop(init, cond, incr, body) => {

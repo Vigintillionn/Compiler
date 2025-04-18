@@ -21,12 +21,12 @@ mod keywords {
 
 pub use keywords::KEYWORDS;
 
+use crate::errors::Span;
+
 #[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
-    pub line: usize,
-    pub col: usize,
-    pub pos: usize,
+    pub span: Span,
 }
 
 #[derive(Debug, Clone, PartialEq)]

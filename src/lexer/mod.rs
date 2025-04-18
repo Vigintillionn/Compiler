@@ -1,33 +1,25 @@
 pub mod tokens;
 use tokens::{Token, TokenKind, KEYWORDS};
 
-use crate::{
-    errors::lexer::{LexerError, LexerResult},
-    errors::Location,
+use crate::errors::{
+    lexer::{LexerError, LexerResult},
+    Span,
 };
 
 struct Lexer<'a> {
     src: &'a str,
     pos: usize,
-    line: usize,
-    col: usize,
 }
 
 impl<'a> Lexer<'a> {
     pub fn new(src: &'a str) -> Self {
-        Lexer {
-            src,
-            pos: 0,
-            line: 1,
-            col: 1,
-        }
+        Lexer { src, pos: 0 }
     }
 
-    fn get_loc(&self) -> Location {
-        Location {
-            line: self.line,
-            col: self.col,
-            pos: self.pos,
+    fn span_for(&self, len: usize) -> Span {
+        Span {
+            start: self.pos,
+            end: self.pos + len,
         }
     }
 
@@ -106,15 +98,18 @@ impl<'a> Lexer<'a> {
             }
         }
 
-        Err(LexerError::InvalidCharacter(self.get_loc(), cmp))
+        Err(LexerError::InvalidCharacter(
+            cmp,
+            self.span_for(cmp.len_utf8()),
+        ))
     }
 
-    fn tokenize_single_token(&mut self) -> LexerResult<(Token, usize)> {
+    fn tokenize_single_token(&mut self) -> LexerResult<(TokenKind, usize)> {
         let next = self
             .src
             .chars()
             .next()
-            .ok_or(LexerError::UnexpectedEOF(self.get_loc()))?;
+            .ok_or(LexerError::UnexpectedEOF(self.span_for(0)))?;
 
         let (tok, bytes) = match next {
             '(' => (TokenKind::OpenParen, 1),
@@ -146,36 +141,37 @@ impl<'a> Lexer<'a> {
                 if self.src.chars().nth(1) == Some('|') {
                     (TokenKind::Or, 2)
                 } else {
-                    return Err(LexerError::InvalidCharacter(self.get_loc(), next));
+                    return Err(LexerError::InvalidCharacter(
+                        next,
+                        self.span_for(next.len_utf8()),
+                    ));
                 }
             }
             '0'..='9' => self.tokenize_number()?,
             c if c.is_alphanumeric() || c == '_' => self.tokenize_ident()?,
-            _ => return Err(LexerError::InvalidCharacter(self.get_loc(), next)),
+            _ => {
+                return Err(LexerError::InvalidCharacter(
+                    next,
+                    self.span_for(next.len_utf8()),
+                ))
+            }
         };
 
-        Ok((
-            Token {
-                kind: tok,
-                line: self.line,
-                col: self.col,
-                pos: self.pos,
-            },
-            bytes,
-        ))
+        Ok((tok, bytes))
     }
 
     fn tokenize_number(&mut self) -> LexerResult<(TokenKind, usize)> {
         let (num, bytes) = self.take_while(|c| c.is_ascii_digit() || c == '.');
+        let span: Span = self.span_for(bytes);
         if num.contains('.') {
             let num = num
                 .parse::<f64>()
-                .map_err(|_| LexerError::InvalidNumber(self.get_loc(), num.to_string()))?;
+                .map_err(|_| LexerError::InvalidNumber(num.to_string(), span))?;
             Ok((TokenKind::FloatLiteral(num), bytes))
         } else {
             let num = num
                 .parse::<i64>()
-                .map_err(|_| LexerError::InvalidNumber(self.get_loc(), num.to_string()))?;
+                .map_err(|_| LexerError::InvalidNumber(num.to_string(), span))?;
             Ok((TokenKind::IntLiteral(num), bytes))
         }
     }
@@ -192,16 +188,6 @@ impl<'a> Lexer<'a> {
     }
 
     fn chomp(&mut self, bytes: usize) {
-        let chunk = &self.src[..bytes];
-        for c in chunk.chars() {
-            if c == '\n' {
-                self.line += 1;
-                self.col = 1;
-            } else {
-                self.col += c.len_utf8();
-            }
-        }
-
         self.src = &self.src[bytes..];
         self.pos += bytes;
     }
@@ -216,7 +202,9 @@ impl Iterator for Lexer<'_> {
             return None;
         }
 
-        let (tok, bytes) = match self.tokenize_single_token() {
+        let start = self.pos;
+
+        let (kind, bytes) = match self.tokenize_single_token() {
             Ok((tok, bytes)) => (tok, bytes),
             Err(e) => {
                 self.chomp(1);
@@ -225,7 +213,9 @@ impl Iterator for Lexer<'_> {
         };
 
         self.chomp(bytes);
-        Some(Ok(tok))
+        let end = self.pos;
+        let span = Span::new(start, end);
+        Some(Ok(Token { kind, span }))
     }
 }
 

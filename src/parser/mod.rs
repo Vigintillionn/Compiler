@@ -1,10 +1,13 @@
 use crate::{
-    errors::parser::{ParserError, ParserResult},
+    errors::{
+        parser::{ParserError, ParserResult},
+        Span, Spanned,
+    },
     lexer::tokens::TokenKind,
     program::UncheckedProgram,
     Token,
 };
-use ast::{Stmt, Type};
+use ast::{Stmt, StmtKind, Type};
 use expressions::parse_expr;
 use framework::{
     alt, balanced_parens, delimited, many, map, opt, preceded, seperated_list, terminated,
@@ -36,14 +39,25 @@ impl<'a> Parser<'a> {
             Self::parse_assign_stmt,
             Self::parse_ret_stmt,
             Self::parse_func_decl,
-            map(terminated(TokenKind::Break, TokenKind::Semi), |_| {
-                Stmt::Break
+            map(terminated(TokenKind::Break, TokenKind::Semi), |break_tok| {
+                Stmt {
+                    node: StmtKind::Break,
+                    span: Span::new(break_tok.span.start, break_tok.span.end + 1),
+                }
             }),
-            map(terminated(TokenKind::Continue, TokenKind::Semi), |_| {
-                Stmt::Continue
-            }),
+            map(
+                terminated(TokenKind::Continue, TokenKind::Semi),
+                |cont_tok| Stmt {
+                    node: StmtKind::Continue,
+                    span: Span::new(cont_tok.span.start, cont_tok.span.end + 1),
+                },
+            ),
             map(terminated(parse_expr, TokenKind::Semi), |expr| {
-                Stmt::Expr(expr)
+                let span = expr.span;
+                Stmt {
+                    node: StmtKind::Expr(expr),
+                    span,
+                }
             }),
         ))(tokens)?;
 
@@ -51,7 +65,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_var_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
-        let (_, tokens) = TokenKind::Var.parse(tokens)?;
+        let (var_tok, tokens) = TokenKind::Var.parse(tokens)?;
         let (name, tokens) = Self::parse_ident(tokens)?;
 
         let (colon, tokens) = opt(TokenKind::Colon).parse(tokens)?;
@@ -62,23 +76,40 @@ impl<'a> Parser<'a> {
         };
 
         let (_, tokens) = TokenKind::Assign.parse(tokens)?;
+        println!("Tokens: {:?}", tokens);
         let (expr, tokens) = parse_expr(tokens)?;
-        let (_, tokens) = TokenKind::Semi.parse(tokens)?;
+        let (semi_tok, tokens) = TokenKind::Semi.parse(tokens)?;
 
-        Ok((Stmt::Var(name, expr, RefCell::new(ty)), tokens))
+        let span = Span::new(var_tok.span.start, semi_tok.span.end);
+
+        Ok((
+            Stmt {
+                node: StmtKind::Var(name, expr, RefCell::new(ty)),
+                span,
+            },
+            tokens,
+        ))
     }
 
     fn parse_assign_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
         let (lhs, tokens) = parse_expr(tokens)?;
         let (_, tokens) = TokenKind::Assign.parse(tokens)?;
         let (rhs, tokens) = parse_expr(tokens)?;
-        let (_, tokens) = TokenKind::Semi.parse(tokens)?;
+        let (semi_tok, tokens) = TokenKind::Semi.parse(tokens)?;
 
-        Ok((Stmt::Assign(lhs, rhs), tokens))
+        let span = Span::new(lhs.span.start, semi_tok.span.end);
+
+        Ok((
+            Stmt {
+                node: StmtKind::Assign(lhs, rhs),
+                span,
+            },
+            tokens,
+        ))
     }
 
     fn parse_if_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
-        let (_, tokens) = TokenKind::If.parse(tokens)?;
+        let (if_tok, tokens) = TokenKind::If.parse(tokens)?;
         // let (cond, tokens) =
         //     delimited(TokenKind::OpenParen, parse_expr, TokenKind::CloseParen)(tokens)?;
         let (cond, tokens) = balanced_parens(parse_expr)(tokens)?;
@@ -90,30 +121,55 @@ impl<'a> Parser<'a> {
             (None, tokens)
         };
 
+        let span = if let Some(else_block) = &else_block {
+            Span::new(if_tok.span.start, else_block.span.end)
+        } else {
+            Span::new(if_tok.span.start, then_block.span.end)
+        };
+
         Ok((
-            Stmt::If(cond, Box::new(then_block), else_block.map(Box::new)),
+            Stmt {
+                node: StmtKind::If(cond, Box::new(then_block), else_block.map(Box::new)),
+                span,
+            },
             tokens,
         ))
     }
 
     fn parse_loop_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
-        let (_, tokens) = TokenKind::Loop.parse(tokens)?;
+        let (loop_tok, tokens) = TokenKind::Loop.parse(tokens)?;
         let (block, tokens) = Self::parse_block(tokens)?;
 
-        Ok((Stmt::Loop(None, None, None, Box::new(block)), tokens))
+        let span = Span::new(loop_tok.span.start, block.span.end);
+
+        Ok((
+            Stmt {
+                node: StmtKind::Loop(None, None, None, Box::new(block)),
+                span,
+            },
+            tokens,
+        ))
     }
 
     fn parse_while_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
-        let (_, tokens) = TokenKind::While.parse(tokens)?;
+        let (while_tok, tokens) = TokenKind::While.parse(tokens)?;
         let (cond, tokens) =
             delimited(TokenKind::OpenParen, parse_expr, TokenKind::CloseParen)(tokens)?;
         let (block, tokens) = Self::parse_block(tokens)?;
 
-        Ok((Stmt::Loop(None, Some(cond), None, Box::new(block)), tokens))
+        let span = Span::new(while_tok.span.start, block.span.end);
+
+        Ok((
+            Stmt {
+                node: StmtKind::Loop(None, Some(cond), None, Box::new(block)),
+                span,
+            },
+            tokens,
+        ))
     }
 
     fn parse_for_loop(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
-        let (_, tokens) = TokenKind::For.parse(tokens)?;
+        let (for_tok, tokens) = TokenKind::For.parse(tokens)?;
         let (_, tokens) = TokenKind::OpenParen.parse(tokens)?;
         let (init, tokens) = opt(alt((Self::parse_var_stmt, Self::parse_assign_stmt)))(tokens)?;
 
@@ -131,8 +187,16 @@ impl<'a> Parser<'a> {
             let (_, tokens) = TokenKind::Assign.parse(tokens)?;
             let (rhs, tokens) = parse_expr(tokens)?;
 
+            let span = Span::new(
+                lhs.as_ref().expect("Lhs is not some").span.start,
+                rhs.span.end,
+            );
+
             (
-                Some(Stmt::Assign(lhs.expect("Lhs is not some"), rhs)),
+                Some(Spanned {
+                    node: StmtKind::Assign(lhs.expect(""), rhs),
+                    span,
+                }),
                 tokens,
             )
         } else {
@@ -142,23 +206,36 @@ impl<'a> Parser<'a> {
         let (_, tokens) = TokenKind::CloseParen.parse(tokens)?;
         let (block, tokens) = Self::parse_block(tokens)?;
 
+        let span = Span::new(for_tok.span.start, block.span.end);
+
         Ok((
-            Stmt::Loop(
-                init.map(Box::new),
-                cond,
-                update.map(Box::new),
-                Box::new(block),
-            ),
+            Stmt {
+                node: StmtKind::Loop(
+                    init.map(Box::new),
+                    cond,
+                    update.map(Box::new),
+                    Box::new(block),
+                ),
+                span,
+            },
             tokens,
         ))
     }
 
     fn parse_ret_stmt(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
-        let (_, tokens) = TokenKind::Ret.parse(tokens)?;
+        let (ret_tok, tokens) = TokenKind::Ret.parse(tokens)?;
         let (expr, tokens) = opt(parse_expr)(tokens)?;
-        let (_, tokens) = TokenKind::Semi.parse(tokens)?;
+        let (semi_tok, tokens) = TokenKind::Semi.parse(tokens)?;
 
-        Ok((Stmt::Ret(expr), tokens))
+        let span = Span::new(ret_tok.span.start, semi_tok.span.end);
+
+        Ok((
+            Stmt {
+                node: StmtKind::Ret(expr),
+                span,
+            },
+            tokens,
+        ))
     }
 
     fn parse_func_decl(tokens: &'a [Token]) -> ParserResult<(Stmt, &'a [Token])> {
@@ -170,7 +247,7 @@ impl<'a> Parser<'a> {
             Ok(((name, ty), tokens))
         };
 
-        let (_, tokens) = TokenKind::Proc.parse(tokens)?;
+        let (proc_tok, tokens) = TokenKind::Proc.parse(tokens)?;
         let (name, tokens) = Self::parse_ident(tokens)?;
         let (_, tokens) = TokenKind::OpenParen.parse(tokens)?;
 
@@ -187,8 +264,13 @@ impl<'a> Parser<'a> {
 
         let (block, tokens) = Self::parse_block(tokens)?;
 
+        let span = Span::new(proc_tok.span.start, block.span.end);
+
         Ok((
-            Stmt::Function(name, args.unwrap_or(vec![]), ret_ty, Box::new(block)),
+            Stmt {
+                node: StmtKind::Function(name, args.unwrap_or(vec![]), ret_ty, Box::new(block)),
+                span,
+            },
             tokens,
         ))
     }
@@ -197,11 +279,11 @@ impl<'a> Parser<'a> {
         if let Some((token, remaining)) = tokens.split_first() {
             match &token.kind {
                 TokenKind::Identifier(name) => Ok((name.clone(), remaining)),
-                _ => Err(ParserError::ExpectedIdentifier(token.clone())),
+                _ => Err(ParserError::ExpectedIdentifier(token.span)),
             }
         } else {
             // Err(ParserError::ExpectedIdentifier(0, 0, 0))
-            Err(ParserError::Other("".to_string()))
+            Err(ParserError::Other("".to_string(), Span::new(0, 0))) // TODO: fix this
         }
     }
 
@@ -212,7 +294,21 @@ impl<'a> Parser<'a> {
             TokenKind::CloseBrace,
         )(tokens)?;
 
-        Ok((Stmt::Block(stmts), tokens))
+        let span = if let Some(first) = stmts.first() {
+            let start = first.span.start;
+            let end = stmts.last().map_or(start, |last| last.span.end);
+            Span::new(start, end)
+        } else {
+            Span::new(0, 0)
+        };
+
+        Ok((
+            Stmt {
+                node: StmtKind::Block(stmts),
+                span,
+            },
+            tokens,
+        ))
     }
 
     fn parse_type(tokens: &'a [Token]) -> ParserResult<(Type, &'a [Token])> {

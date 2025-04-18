@@ -239,6 +239,14 @@ impl Eval for UnaryOp {
         let Self(op, expr) = self;
 
         let res = match op {
+            Op::Negate => {
+                let val = expr.eval(env).into_value();
+                match val {
+                    Value::Int(v) => Value::Int(-v),
+                    Value::Float(v) => Value::Float(-v),
+                    _ => panic!("Negate operator can only be applied to numeric types"),
+                }
+            }
             Op::Not => {
                 let val = expr.eval(env).into_value();
                 Value::Boolean(!val.is_truthy())

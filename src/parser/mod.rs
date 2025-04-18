@@ -76,7 +76,6 @@ impl<'a> Parser<'a> {
         };
 
         let (_, tokens) = TokenKind::Assign.parse(tokens)?;
-        println!("Tokens: {:?}", tokens);
         let (expr, tokens) = parse_expr(tokens)?;
         let (semi_tok, tokens) = TokenKind::Semi.parse(tokens)?;
 

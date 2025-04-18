@@ -79,6 +79,13 @@ impl TypeCheck for Expr {
                 use Op::*;
                 let expr_type = expr.type_check(env, &None)?;
                 let res = match op {
+                    Negate => {
+                        if matches!(expr_type, Type::Int | Type::Float) {
+                            expr_type
+                        } else {
+                            return Err(format!("Type mismatch: {:?}", expr_type));
+                        }
+                    }
                     Not => {
                         if expr_type == Type::Boolean {
                             Type::Boolean

@@ -8,6 +8,7 @@ pub type LexerResult<T> = Result<T, LexerError>;
 pub enum LexerError {
     InvalidCharacter(char, Span),
     InvalidNumber(String, Span),
+    UnterminatedString(Span),
     UnexpectedEOF(Span),
     Other(String, Span),
 }
@@ -24,6 +25,9 @@ impl fmt::Display for LexerError {
             LexerError::UnexpectedEOF(_) => {
                 write!(f, "Unexpected end of file")
             }
+            LexerError::UnterminatedString(_) => {
+                write!(f, "Unterminated string literal")
+            }
             LexerError::Other(msg, _) => {
                 write!(f, "Lexer error: {}", msg)
             }
@@ -37,6 +41,7 @@ impl ReportableError for &LexerError {
             LexerError::InvalidCharacter(_, span) => span,
             LexerError::InvalidNumber(_, span) => span,
             LexerError::UnexpectedEOF(span) => span,
+            LexerError::UnterminatedString(span) => span,
             LexerError::Other(_, span) => span,
         }
     }

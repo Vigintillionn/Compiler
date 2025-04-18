@@ -147,6 +147,7 @@ impl<'a> Lexer<'a> {
                     ));
                 }
             }
+            '"' => self.tokenize_string()?,
             '0'..='9' => self.tokenize_number()?,
             c if c.is_alphanumeric() || c == '_' => self.tokenize_ident()?,
             _ => {
@@ -185,6 +186,37 @@ impl<'a> Lexer<'a> {
             .unwrap_or(TokenKind::Identifier(ident.to_string()));
 
         Ok((tok, bytes))
+    }
+
+    fn tokenize_string(&mut self) -> LexerResult<(TokenKind, usize)> {
+        let mut str_lit = String::new();
+        let mut chars = self.src.chars();
+        chars.next(); // Skip opening quote
+        let mut consumed = 1;
+
+        while let Some(c) = chars.next() {
+            consumed += c.len_utf8();
+            if c == '"' {
+                return Ok((TokenKind::StringLiteral(str_lit), consumed));
+            } else if c == '\\' {
+                // handle escape sequences
+                let esc = chars
+                    .next()
+                    .ok_or_else(|| LexerError::UnterminatedString(self.span_for(consumed)))?;
+                consumed += esc.len_utf8();
+                str_lit.push(match esc {
+                    'n' => '\n',
+                    't' => '\t',
+                    '"' => '"',
+                    '\\' => '\\',
+                    _ => esc, // fallback
+                });
+            } else {
+                str_lit.push(c);
+            }
+        }
+
+        Err(LexerError::UnterminatedString(self.span_for(consumed)))
     }
 
     fn chomp(&mut self, bytes: usize) {

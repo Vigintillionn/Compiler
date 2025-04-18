@@ -44,6 +44,13 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                 ),
                 span,
             }), // TODO: Handle typing
+            StringLiteral(ref s) => output.push(Expr {
+                node: ExprInner(
+                    ExprKind::Literal(LiteralValue::String(s.clone())),
+                    RefCell::new(Some(Type::String)),
+                ),
+                span,
+            }),
             BoolLiteral(b) => output.push(Expr {
                 node: ExprInner(
                     ExprKind::Literal(LiteralValue::Boolean(b)),

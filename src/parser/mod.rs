@@ -52,12 +52,9 @@ impl<'a> Parser<'a> {
                     span: Span::new(cont_tok.span.start, cont_tok.span.end + 1),
                 },
             ),
-            map(terminated(parse_expr, TokenKind::Semi), |expr| {
-                let span = expr.span;
-                Stmt {
-                    node: StmtKind::Expr(expr),
-                    span,
-                }
+            map(terminated(parse_expr, TokenKind::Semi), |expr| Stmt {
+                span: expr.span,
+                node: StmtKind::Expr(expr),
             }),
         ))(tokens)?;
 

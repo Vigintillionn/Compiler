@@ -16,30 +16,23 @@ pub enum ParserError {
 }
 
 impl ParserError {
-    fn pos(&self) -> (usize, usize) {
-        match self {
-            ParserError::InvalidExpression(span) => (span.start, span.end),
-            ParserError::MissingToken(_, span) => (span.start, span.end),
-            ParserError::MismatchedParantheses(span) => (span.start, span.end),
-            ParserError::ExpectedIdentifier(span) => (span.start, span.end),
-            ParserError::Other(_, span) => (span.start, span.end),
-        }
-    }
-
     fn rank(&self) -> usize {
         match self {
-            ParserError::MissingToken(_, _) => 3,
-            ParserError::InvalidExpression(_) => 2,
-            ParserError::ExpectedIdentifier(_) => 2,
-            ParserError::MismatchedParantheses(_) => 2,
+            // Less important
             ParserError::Other(_, _) => 0,
+            // Semicolons, commas, etc
+            ParserError::MissingToken(_, _) => 1,
+            // Syntax level issues
+            ParserError::InvalidExpression(_)
+            | ParserError::ExpectedIdentifier(_)
+            | ParserError::MismatchedParantheses(_) => 2,
         }
     }
 }
 
 impl PartialEq for ParserError {
     fn eq(&self, other: &Self) -> bool {
-        self.pos() == other.pos() && self.rank() == other.rank()
+        self.get_span() == other.get_span() && self.rank() == other.rank()
     }
 }
 
@@ -47,10 +40,14 @@ impl Eq for ParserError {}
 
 impl Ord for ParserError {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        if self.rank() == other.rank() {
-            return self.pos().cmp(&other.pos());
-        }
-        (self.pos(), self.rank()).cmp(&(other.pos(), other.rank()))
+        let self_span = self.get_span();
+        let other_span = other.get_span();
+
+        self_span
+            .end
+            .cmp(&other_span.end)
+            .then_with(|| self.rank().cmp(&other.rank())) // Break ties with rank
+            .then_with(|| self_span.start.cmp(&other_span.start)) // Breka ranked ties with starting positions
     }
 }
 
@@ -88,9 +85,13 @@ impl fmt::Display for ParserError {
 
 impl ReportableError for &ParserError {
     fn get_span(&self) -> &Span {
+        use ParserError::*;
         match self {
-            ParserError::InvalidExpression(span) => span,
-            _ => todo!(),
+            InvalidExpression(span)
+            | ExpectedIdentifier(span)
+            | MissingToken(_, span)
+            | MismatchedParantheses(span)
+            | Other(_, span) => span,
         }
     }
 }

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, ops::Range};
 
 use crate::sourcemap::SourceMap;
 
@@ -22,6 +22,10 @@ impl Span {
 
     pub fn len(&self) -> usize {
         self.end - self.start
+    }
+
+    pub fn as_range(&self) -> Range<usize> {
+        self.start..self.end
     }
 }
 

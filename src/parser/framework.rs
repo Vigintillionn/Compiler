@@ -169,8 +169,6 @@ macro_rules! choice_trait_inner {
     }
   };
   ($it:tt, $self:expr, $input:expr, $err:expr, $head:ident) => {
-    // Err("All parsers failed".to_string())
-    // Err(ParserError::Other("All parsers failed".to_string()))
     Err($err)
   };
 }

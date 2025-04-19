@@ -70,7 +70,7 @@ impl fmt::Display for ParserError {
                 write!(f, "Invalid expression")
             }
             ParserError::MissingToken(token, _) => {
-                write!(f, "Missing token: {:?}", token)
+                write!(f, "Expected token: {:?}", token)
             }
             ParserError::MismatchedParantheses(token) => {
                 write!(f, "Mismatched parantheses: {:?}", token)

@@ -81,7 +81,11 @@ impl<'a> Parser<'a, Token> for TokenKind {
             if *self == first.kind {
                 return Ok(((*first).clone(), rest));
             } else {
-                return Err(ParserError::MissingToken(self.clone(), first.span));
+                return Err(ParserError::MissingToken(
+                    self.clone(),
+                    first.kind.clone(),
+                    first.span,
+                ));
             }
         }
         Err(ParserError::Other("".to_string(), Span::new(0, 0))) // TODO: Handle this case properly

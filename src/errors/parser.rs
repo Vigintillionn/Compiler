@@ -9,9 +9,9 @@ pub type ParserResult<T> = Result<T, ParserError>;
 #[derive(Debug, Clone)]
 pub enum ParserError {
     InvalidExpression(Span),
-    MissingToken(TokenKind, Span),
+    MissingToken(TokenKind, TokenKind, Span),
     MismatchedParantheses(Span),
-    ExpectedIdentifier(Span),
+    ExpectedIdentifier(TokenKind, Span),
     Other(String, Span), // TODO: improve the locations here
 }
 
@@ -21,10 +21,10 @@ impl ParserError {
             // Less important
             ParserError::Other(_, _) => 0,
             // Semicolons, commas, etc
-            ParserError::MissingToken(_, _) => 1,
+            ParserError::MissingToken(_, _, _) => 1,
             // Syntax level issues
             ParserError::InvalidExpression(_)
-            | ParserError::ExpectedIdentifier(_)
+            | ParserError::ExpectedIdentifier(_, _)
             | ParserError::MismatchedParantheses(_) => 2,
         }
     }
@@ -69,14 +69,14 @@ impl fmt::Display for ParserError {
             ParserError::InvalidExpression(_) => {
                 write!(f, "Invalid expression")
             }
-            ParserError::MissingToken(token, _) => {
-                write!(f, "Expected token: {:?}", token)
+            ParserError::MissingToken(expected, got, _) => {
+                write!(f, "Expected '{}' but got '{}'", expected, got)
             }
-            ParserError::MismatchedParantheses(token) => {
-                write!(f, "Mismatched parantheses: {:?}", token)
+            ParserError::MismatchedParantheses(_) => {
+                write!(f, "Mismatched parantheses")
             }
-            ParserError::ExpectedIdentifier(token) => {
-                write!(f, "Expected identifier: {:?}", token)
+            ParserError::ExpectedIdentifier(token, _) => {
+                write!(f, "Expected identifier but got '{}'", token)
             }
             _ => todo!(),
         }
@@ -88,8 +88,8 @@ impl ReportableError for &ParserError {
         use ParserError::*;
         match self {
             InvalidExpression(span)
-            | ExpectedIdentifier(span)
-            | MissingToken(_, span)
+            | ExpectedIdentifier(_, span)
+            | MissingToken(_, _, span)
             | MismatchedParantheses(span)
             | Other(_, span) => span,
         }

@@ -19,6 +19,8 @@ mod keywords {
     };
 }
 
+use std::fmt;
+
 pub use keywords::KEYWORDS;
 
 use crate::errors::Span;
@@ -154,6 +156,56 @@ impl TokenKind {
             IntLiteral(s) => s.to_string().len(),
             FloatLiteral(s) => s.to_string().len(),
             BoolLiteral(s) => s.to_string().len(),
+        }
+    }
+}
+
+impl fmt::Display for TokenKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TokenKind::Identifier(s) => write!(f, "{}", s),
+            TokenKind::StringLiteral(s) => write!(f, "{}", s),
+            TokenKind::IntLiteral(s) => write!(f, "{}", s),
+            TokenKind::FloatLiteral(s) => write!(f, "{}", s),
+            TokenKind::BoolLiteral(s) => write!(f, "{}", s),
+
+            TokenKind::While => write!(f, "while"),
+            TokenKind::For => write!(f, "for"),
+            TokenKind::Loop => write!(f, "loop"),
+            TokenKind::If => write!(f, "if"),
+            TokenKind::Else => write!(f, "else"),
+            TokenKind::Var => write!(f, "var"),
+            TokenKind::Ret => write!(f, "ret"),
+            TokenKind::Proc => write!(f, "proc"),
+            TokenKind::Break => write!(f, "break"),
+            TokenKind::Continue => write!(f, "continue"),
+            TokenKind::Int => write!(f, "int"),
+            TokenKind::Float => write!(f, "float"),
+            TokenKind::Str => write!(f, "str"),
+            TokenKind::Bool => write!(f, "bool"),
+            TokenKind::Plus => write!(f, "+"),
+            TokenKind::Minus => write!(f, "-"),
+            TokenKind::Asterisk => write!(f, "*"),
+            TokenKind::Slash => write!(f, "/"),
+            TokenKind::Assign => write!(f, "="),
+            TokenKind::Bang => write!(f, "!"),
+            TokenKind::Eq => write!(f, "=="),
+            TokenKind::NotEq => write!(f, "!="),
+            TokenKind::LThan => write!(f, "<"),
+            TokenKind::GThan => write!(f, ">"),
+            TokenKind::LThanEq => write!(f, "<="),
+            TokenKind::GThanEq => write!(f, ">="),
+            TokenKind::Ampersand => write!(f, "&"),
+            TokenKind::Semi => write!(f, ";"),
+            TokenKind::Colon => write!(f, ":"),
+            TokenKind::OpenParen => write!(f, "("),
+            TokenKind::CloseParen => write!(f, ")"),
+            TokenKind::OpenBrace => write!(f, "{{"),
+            TokenKind::CloseBrace => write!(f, "}}"),
+            TokenKind::Comma => write!(f, ","),
+            TokenKind::Arrow => write!(f, "->"),
+            TokenKind::And => write!(f, "&&"),
+            TokenKind::Or => write!(f, "||"),
         }
     }
 }

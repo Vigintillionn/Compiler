@@ -275,7 +275,10 @@ impl<'a> Parser<'a> {
         if let Some((token, remaining)) = tokens.split_first() {
             match &token.kind {
                 TokenKind::Identifier(name) => Ok((name.clone(), remaining)),
-                _ => Err(ParserError::ExpectedIdentifier(token.span)),
+                _ => Err(ParserError::ExpectedIdentifier(
+                    token.kind.clone(),
+                    token.span,
+                )),
             }
         } else {
             // Err(ParserError::ExpectedIdentifier(0, 0, 0))

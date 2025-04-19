@@ -221,7 +221,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
         Ok((output.pop().unwrap(), tokens))
     } else {
         let start = first_tok.span.start;
-        let end = tokens.last().map_or(first_tok.span.end, |t| t.span.end);
+        let end = output.last().map_or(first_tok.span.end, |t| t.span.end);
         let span = Span::new(start, end);
 
         Err(ParserError::InvalidExpression(span)) // TODO ERROR

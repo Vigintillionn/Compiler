@@ -7,13 +7,13 @@ use super::{ReportableError, Span};
 pub enum AnalysisError {
     UndefinedVariable(String, Span),
     UndefinedFunction(String, Span),
-    TypeMismatch(Type, Type, Span),       // Expected type, actual type
-    ReturnTypeMismatch(Type, Type, Span), // Expected type, actual type
+    TypeMismatch(Type, Type, Span), // Expected type, actual type
+    ReturnTypeMismatch(String, Type, Type, Span), // Expected type, actual type
     IncompatibleTypesBin(Op, Type, Type, Span), // Left type, right type
-    IncompatibleTypesUn(Op, Type, Span),  // Left type, right type
-    UnsupportedOperation(Op, Span),       // Left type, right type
+    IncompatibleTypesUn(Op, Type, Span), // Left type, right type
+    UnsupportedOperation(Op, Span), // Left type, right type
     WrongArity(usize, usize, String, Span), // Expected arity, actual arity, function name
-    UncallableType(Type, Span),           // Type, span
+    UncallableType(Type, Span),     // Type, span
     Other(String, Span),
 }
 
@@ -29,33 +29,33 @@ impl fmt::Display for AnalysisError {
             AnalysisError::TypeMismatch(expected, actual, _) => {
                 write!(
                     f,
-                    "Type mismatch: expected {:?}, found {:?}",
+                    "Type mismatch: expected '{}', found '{}'",
                     expected, actual
                 )
             }
             AnalysisError::IncompatibleTypesBin(op, left, right, _) => {
                 write!(
                     f,
-                    "Incompatible types for operation '{:?}': left type {:?}, right type {:?}",
+                    "Incompatible types for binary operator '{}': left type '{}', right type '{}'",
                     op, left, right
                 )
             }
             AnalysisError::IncompatibleTypesUn(op, left, _) => {
                 write!(
                     f,
-                    "Incompatible types for operation '{:?}': type {:?}",
+                    "Incompatible type for unary operator '{}': type '{}'",
                     op, left
                 )
             }
-            AnalysisError::ReturnTypeMismatch(expected, actual, _) => {
+            AnalysisError::ReturnTypeMismatch(name, expected, actual, _) => {
                 write!(
                     f,
-                    "Return type mismatch: expected {:?}, found {:?}",
-                    expected, actual
+                    "Function '{}' returns type '{}' but got '{}'",
+                    name, expected, actual
                 )
             }
             AnalysisError::UnsupportedOperation(op, _) => {
-                write!(f, "Unsupported operation '{:?}'", op)
+                write!(f, "Unsupported operation '{}'", op)
             }
             AnalysisError::WrongArity(expected, actual, name, _) => {
                 write!(
@@ -65,7 +65,7 @@ impl fmt::Display for AnalysisError {
                 )
             }
             AnalysisError::UncallableType(typ, _) => {
-                write!(f, "Uncallable type '{:?}'", typ)
+                write!(f, "Uncallable type '{}'", typ)
             }
             AnalysisError::Other(msg, _) => {
                 write!(f, "{}", msg)
@@ -82,7 +82,7 @@ impl ReportableError for &AnalysisError {
             AnalysisError::TypeMismatch(_, _, span) => span,
             AnalysisError::IncompatibleTypesBin(_, _, _, span) => span,
             AnalysisError::IncompatibleTypesUn(_, _, span) => span,
-            AnalysisError::ReturnTypeMismatch(_, _, span) => span,
+            AnalysisError::ReturnTypeMismatch(_, _, _, span) => span,
             AnalysisError::UnsupportedOperation(_, span) => span,
             AnalysisError::WrongArity(_, _, _, span) => span,
             AnalysisError::UncallableType(_, span) => span,

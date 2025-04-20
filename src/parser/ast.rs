@@ -3,6 +3,7 @@ use crate::{
     lexer::tokens::{Assoc, TokenKind},
     Token,
 };
+use core::fmt;
 use std::cell::RefCell;
 
 pub type Block = Vec<Stmt>;
@@ -17,6 +18,31 @@ pub enum Type {
     Void,
     Pointer(Box<Type>),
     Any,
+}
+
+impl fmt::Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Type::*;
+        match self {
+            Int => write!(f, "int"),
+            Float => write!(f, "float"),
+            String => write!(f, "string"),
+            Boolean => write!(f, "bool"),
+            Function(args, ret, _) => {
+                write!(f, "proc(")?;
+                for (i, arg) in args.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{}", arg)?;
+                }
+                write!(f, ") -> {}", ret)
+            }
+            Void => write!(f, "void"),
+            Pointer(inner) => write!(f, "&{}", inner),
+            Any => write!(f, "any"),
+        }
+    }
 }
 
 pub type Stmt = Spanned<StmtKind>;
@@ -88,6 +114,30 @@ pub enum Op {
     Negate,
     Deref,
     AddressOf,
+}
+
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Op::*;
+        match self {
+            Add => write!(f, "+"),
+            Sub => write!(f, "-"),
+            Mul => write!(f, "*"),
+            Div => write!(f, "/"),
+            Eq => write!(f, "=="),
+            Neq => write!(f, "!="),
+            Lt => write!(f, "<"),
+            Lte => write!(f, "<="),
+            Gt => write!(f, ">"),
+            Gte => write!(f, ">="),
+            And => write!(f, "&&"),
+            Or => write!(f, "||"),
+            Not => write!(f, "!"),
+            Negate => write!(f, "-"),
+            Deref => write!(f, "*"),
+            AddressOf => write!(f, "&"),
+        }
+    }
 }
 
 impl From<&DisambiguatedOp> for Op {

@@ -6,13 +6,21 @@ use crate::{
 
 pub type TypeEnv = Environment<Type>;
 
+pub struct Expected {
+    func: String,
+    ty: Type,
+}
+
 pub trait TypeCheck {
-    fn type_check(&self, env: &mut TypeEnv, expected: &Option<Type>)
-        -> Result<Type, AnalysisError>;
+    fn type_check(
+        &self,
+        env: &mut TypeEnv,
+        expected: &Option<Expected>,
+    ) -> Result<Type, AnalysisError>;
 }
 
 impl TypeCheck for Expr {
-    fn type_check(&self, env: &mut TypeEnv, _: &Option<Type>) -> Result<Type, AnalysisError> {
+    fn type_check(&self, env: &mut TypeEnv, _: &Option<Expected>) -> Result<Type, AnalysisError> {
         use ExprKind::*;
         match &self.node.0 {
             Literal(val) => match val {
@@ -204,7 +212,7 @@ impl TypeCheck for Stmt {
     fn type_check(
         &self,
         env: &mut TypeEnv,
-        expected: &Option<Type>,
+        expected: &Option<Expected>,
     ) -> Result<Type, AnalysisError> {
         use StmtKind::*;
         match &self.node {
@@ -307,9 +315,10 @@ impl TypeCheck for Stmt {
                 };
 
                 if let Some(expected) = expected {
-                    if ret_type != *expected {
+                    if ret_type != expected.ty {
                         return Err(AnalysisError::ReturnTypeMismatch(
-                            expected.clone(),
+                            expected.func.clone(),
+                            expected.ty.clone(),
                             ret_type,
                             self.span,
                         ));
@@ -329,7 +338,13 @@ impl TypeCheck for Stmt {
                     env.define(arg_name.clone(), arg_type.clone());
                 }
 
-                body.type_check(env, &Some(ret_type.clone()))?;
+                body.type_check(
+                    env,
+                    &Some(Expected {
+                        func: name.clone(),
+                        ty: ret_type.clone(),
+                    }),
+                )?;
                 env.exit_scope();
 
                 Ok(Type::Void)

@@ -1,17 +1,18 @@
 use crate::{
     environment::Environment,
+    errors::analysis::AnalysisError,
     parser::ast::{self, Expr, ExprKind, LiteralValue, Op, Stmt, StmtKind, Type, UnaryOp},
-    program::UncheckedProgram,
 };
 
 pub type TypeEnv = Environment<Type>;
 
 pub trait TypeCheck {
-    fn type_check(&self, env: &mut TypeEnv, expected: &Option<Type>) -> Result<Type, String>;
+    fn type_check(&self, env: &mut TypeEnv, expected: &Option<Type>)
+        -> Result<Type, AnalysisError>;
 }
 
 impl TypeCheck for Expr {
-    fn type_check(&self, env: &mut TypeEnv, _: &Option<Type>) -> Result<Type, String> {
+    fn type_check(&self, env: &mut TypeEnv, _: &Option<Type>) -> Result<Type, AnalysisError> {
         use ExprKind::*;
         match &self.node.0 {
             Literal(val) => match val {
@@ -25,7 +26,7 @@ impl TypeCheck for Expr {
                     *self.node.1.borrow_mut() = Some(ty.clone());
                     Ok(ty.clone())
                 } else {
-                    Err(format!("Undefined variable: {}", id))
+                    Err(AnalysisError::UndefinedVariable(id.clone(), self.span))
                 }
             }
             BinaryOp(ast::BinaryOp(left, op, right)) => {
@@ -37,39 +38,64 @@ impl TypeCheck for Expr {
                         if left == right && matches!(left, Type::Int | Type::Float | Type::String) {
                             left
                         } else {
-                            return Err(format!("Type mismatch: {:?} and {:?}", left, right));
+                            return Err(AnalysisError::IncompatibleTypesBin(
+                                op.clone(),
+                                left,
+                                right,
+                                self.span,
+                            ));
                         }
                     }
                     Sub | Mul | Div => {
                         if left == right && matches!(left, Type::Int | Type::Float) {
                             left
                         } else {
-                            return Err(format!("Type mismatch: {:?} and {:?}", left, right));
+                            return Err(AnalysisError::IncompatibleTypesBin(
+                                op.clone(),
+                                left,
+                                right,
+                                self.span,
+                            ));
                         }
                     }
                     Eq | Neq => {
                         if left == right {
                             Type::Boolean
                         } else {
-                            return Err(format!("Type mismatch: {:?} and {:?}", left, right));
+                            return Err(AnalysisError::IncompatibleTypesBin(
+                                op.clone(),
+                                left,
+                                right,
+                                self.span,
+                            ));
                         }
                     }
                     Lt | Lte | Gt | Gte => {
                         if left == right && matches!(left, Type::Int | Type::Float) {
                             Type::Boolean
                         } else {
-                            return Err(format!("Type mismatch: {:?} and {:?}", left, right));
+                            return Err(AnalysisError::IncompatibleTypesBin(
+                                op.clone(),
+                                left,
+                                right,
+                                self.span,
+                            ));
                         }
                     }
                     And | Or => {
                         if left == Type::Boolean && right == Type::Boolean {
                             Type::Boolean
                         } else {
-                            return Err(format!("Type mismatch: {:?} and {:?}", left, right));
+                            return Err(AnalysisError::IncompatibleTypesBin(
+                                op.clone(),
+                                left,
+                                right,
+                                self.span,
+                            ));
                         }
                     }
                     _ => {
-                        return Err(format!("Unsupported operator: {:?}", op));
+                        return Err(AnalysisError::UnsupportedOperation(op.clone(), self.span));
                     }
                 };
                 *self.node.1.borrow_mut() = Some(res.clone());
@@ -83,20 +109,38 @@ impl TypeCheck for Expr {
                         if matches!(expr_type, Type::Int | Type::Float) {
                             expr_type
                         } else {
-                            return Err(format!("Type mismatch: {:?}", expr_type));
+                            return Err(AnalysisError::IncompatibleTypesUn(
+                                op.clone(),
+                                expr_type,
+                                self.span,
+                            )); // TODO: better error
                         }
                     }
                     Not => {
                         if expr_type == Type::Boolean {
                             Type::Boolean
                         } else {
-                            return Err(format!("Type mismatch: {:?}", expr_type));
+                            return Err(AnalysisError::IncompatibleTypesUn(
+                                op.clone(),
+                                expr_type,
+                                self.span,
+                            ));
                         }
                     }
                     AddressOf => Type::Pointer(Box::new(expr_type)),
-                    Deref => Type::Int, // TODO: Fix
+                    Deref => {
+                        if let Type::Pointer(ty) = expr_type {
+                            *ty
+                        } else {
+                            return Err(AnalysisError::IncompatibleTypesUn(
+                                op.clone(),
+                                expr_type,
+                                self.span,
+                            ));
+                        }
+                    }
                     _ => {
-                        return Err(format!("Unsupported operator: {:?}", op));
+                        return Err(AnalysisError::UnsupportedOperation(op.clone(), self.span));
                     }
                 };
                 *self.node.1.borrow_mut() = Some(res.clone());
@@ -105,25 +149,26 @@ impl TypeCheck for Expr {
             Call(name, args) => {
                 let func_type = match env.get(name) {
                     Some(ty) => ty,
-                    None => return Err(format!("Undefined function: {}", name)),
+                    None => return Err(AnalysisError::UndefinedFunction(name.clone(), self.span)),
                 };
                 match func_type.clone() {
                     Type::Function(args_types, ret_type, variadic) => {
                         if args.len() != args_types.len() && !variadic {
-                            return Err(format!(
-                                "Function {} expects {} arguments, found {}",
-                                name,
+                            return Err(AnalysisError::WrongArity(
                                 args_types.len(),
-                                args.len()
+                                args.len(),
+                                name.clone(),
+                                self.span,
                             ));
                         }
 
                         for (arg, expected_type) in args.iter().zip(args_types.iter()) {
                             let arg_type = arg.type_check(env, &None)?;
                             if &arg_type != expected_type && expected_type != &Type::Any {
-                                return Err(format!(
-                                    "Type mismatch: expected {:?}, found {:?}",
-                                    expected_type, arg_type
+                                return Err(AnalysisError::TypeMismatch(
+                                    expected_type.clone(),
+                                    arg_type,
+                                    self.span,
                                 ));
                             }
                         }
@@ -134,9 +179,10 @@ impl TypeCheck for Expr {
                             for arg in &args[args_types.len()..] {
                                 let arg_type = arg.type_check(env, &None)?;
                                 if &arg_type != last_type && last_type != &Type::Any {
-                                    return Err(format!(
-                                        "Type mismatch: expected {:?}, found {:?}",
-                                        last_type, arg_type
+                                    return Err(AnalysisError::TypeMismatch(
+                                        last_type.clone(),
+                                        arg_type,
+                                        self.span,
                                     ));
                                 }
                             }
@@ -146,7 +192,7 @@ impl TypeCheck for Expr {
                         Ok(*ret_type.clone())
                     }
                     _ => {
-                        return Err(format!("{} is not a function", name));
+                        return Err(AnalysisError::UncallableType(func_type, self.span));
                     }
                 }
             }
@@ -155,7 +201,11 @@ impl TypeCheck for Expr {
 }
 
 impl TypeCheck for Stmt {
-    fn type_check(&self, env: &mut TypeEnv, expected: &Option<Type>) -> Result<Type, String> {
+    fn type_check(
+        &self,
+        env: &mut TypeEnv,
+        expected: &Option<Type>,
+    ) -> Result<Type, AnalysisError> {
         use StmtKind::*;
         match &self.node {
             Block(stmts) => {
@@ -171,9 +221,10 @@ impl TypeCheck for Stmt {
                 {
                     if let Some(ty) = ty.borrow().as_ref() {
                         if ty != &expr_type {
-                            return Err(format!(
-                                "Type mismatch: expected {:?}, found {:?}",
-                                ty, expr_type
+                            return Err(AnalysisError::TypeMismatch(
+                                ty.clone(),
+                                expr_type,
+                                self.span,
                             ));
                         }
                     }
@@ -199,20 +250,21 @@ impl TypeCheck for Stmt {
                     let ty = if let Type::Pointer(ty) = ty { *ty } else { ty };
 
                     if ty != rhs_type {
-                        return Err(format!(
-                            "Type mismatch: expected {:?}, found {:?}",
-                            ty, rhs_type
-                        ));
+                        return Err(AnalysisError::TypeMismatch(ty, rhs_type, self.span));
                     }
                 } else {
-                    return Err(format!("Undefined variable: {}", name));
+                    return Err(AnalysisError::UndefinedFunction(name.clone(), self.span));
                 }
                 Ok(Type::Void)
             }
             If(cond, then_stmt, else_stmt) => {
                 let cond_type = cond.type_check(env, expected)?;
                 if cond_type != Type::Boolean {
-                    return Err(format!("Condition must be boolean, found {:?}", cond_type));
+                    return Err(AnalysisError::TypeMismatch(
+                        Type::Boolean,
+                        cond_type,
+                        self.span,
+                    ));
                 }
                 then_stmt.type_check(env, expected)?;
                 if let Some(else_stmt) = else_stmt {
@@ -233,7 +285,11 @@ impl TypeCheck for Stmt {
                 if let Some(cond) = cond {
                     let cond_type = cond.type_check(env, expected)?;
                     if cond_type != Type::Boolean {
-                        return Err(format!("Condition must be boolean, found {:?}", cond_type));
+                        return Err(AnalysisError::TypeMismatch(
+                            Type::Boolean,
+                            cond_type,
+                            self.span,
+                        ));
                     }
                 }
                 if let Some(incr) = incr {
@@ -252,9 +308,10 @@ impl TypeCheck for Stmt {
 
                 if let Some(expected) = expected {
                     if ret_type != *expected {
-                        return Err(format!(
-                            "Return type mismatch: expected {:?}, found {:?}",
-                            expected, ret_type
+                        return Err(AnalysisError::ReturnTypeMismatch(
+                            expected.clone(),
+                            ret_type,
+                            self.span,
                         ));
                     }
                 }
@@ -279,14 +336,5 @@ impl TypeCheck for Stmt {
             }
             Continue | Break => Ok(Type::Void),
         }
-    }
-}
-
-impl TypeCheck for UncheckedProgram {
-    fn type_check(&self, env: &mut TypeEnv, _: &Option<Type>) -> Result<Type, String> {
-        for stmt in &self.stmts {
-            stmt.type_check(env, &None)?;
-        }
-        Ok(Type::Void)
     }
 }

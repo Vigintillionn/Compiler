@@ -1,4 +1,5 @@
 use crate::{
+    errors::analysis::AnalysisError,
     parser::ast::Type,
     program::{CfCheckedProgram, TypeCheckedProgram, UncheckedProgram},
 };
@@ -8,15 +9,29 @@ use type_check::{TypeCheck, TypeEnv};
 mod cf_check;
 mod type_check;
 
-pub fn type_check_program(program: UncheckedProgram) -> Result<TypeCheckedProgram, String> {
+pub fn type_check_program(
+    program: UncheckedProgram,
+) -> Result<TypeCheckedProgram, Vec<AnalysisError>> {
+    let mut errors = Vec::new();
+
     let mut env = TypeEnv::new();
     env.define(
         "print".to_string(),
         Type::Function(vec![Type::Any], Box::new(Type::Void), true),
     );
-    program.type_check(&mut env, &None)?;
 
-    Ok(program.into_type_checked())
+    for stmt in &program.stmts {
+        match stmt.type_check(&mut env, &None) {
+            Ok(_) => {}
+            Err(err) => errors.push(err),
+        }
+    }
+
+    if !errors.is_empty() {
+        Err(errors)
+    } else {
+        Ok(program.into_type_checked())
+    }
 }
 
 pub fn cf_check_program(program: TypeCheckedProgram) -> Result<CfCheckedProgram, String> {

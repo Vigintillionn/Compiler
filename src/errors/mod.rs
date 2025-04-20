@@ -2,6 +2,7 @@ use std::{fmt, ops::Range};
 
 use crate::sourcemap::SourceMap;
 
+pub mod analysis;
 pub mod lexer;
 pub mod parser;
 

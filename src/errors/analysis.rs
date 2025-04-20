@@ -5,6 +5,7 @@ use crate::parser::ast::{Op, Type};
 use super::{ReportableError, Span};
 
 pub enum AnalysisError {
+    // Type Checking
     UndefinedVariable(String, Span),
     UndefinedFunction(String, Span),
     TypeMismatch(Type, Type, Span), // Expected type, actual type
@@ -14,60 +15,72 @@ pub enum AnalysisError {
     UnsupportedOperation(Op, Span), // Left type, right type
     WrongArity(usize, usize, String, Span), // Expected arity, actual arity, function name
     UncallableType(Type, Span),     // Type, span
+    // Control Flow
+    Unreachable(Span),
+    FunctionNoReturnAllPaths(String, Span),
+
     Other(String, Span),
 }
 
 impl fmt::Display for AnalysisError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use AnalysisError::*;
         match self {
-            AnalysisError::UndefinedVariable(name, _) => {
+            UndefinedVariable(name, _) => {
                 write!(f, "Undefined variable '{}'", name)
             }
-            AnalysisError::UndefinedFunction(name, _) => {
+            UndefinedFunction(name, _) => {
                 write!(f, "Undefined function '{}'", name)
             }
-            AnalysisError::TypeMismatch(expected, actual, _) => {
+            TypeMismatch(expected, actual, _) => {
                 write!(
                     f,
                     "Type mismatch: expected '{}', found '{}'",
                     expected, actual
                 )
             }
-            AnalysisError::IncompatibleTypesBin(op, left, right, _) => {
+            IncompatibleTypesBin(op, left, right, _) => {
                 write!(
                     f,
                     "Incompatible types for binary operator '{}': left type '{}', right type '{}'",
                     op, left, right
                 )
             }
-            AnalysisError::IncompatibleTypesUn(op, left, _) => {
+            IncompatibleTypesUn(op, left, _) => {
                 write!(
                     f,
                     "Incompatible type for unary operator '{}': type '{}'",
                     op, left
                 )
             }
-            AnalysisError::ReturnTypeMismatch(name, expected, actual, _) => {
+            ReturnTypeMismatch(name, expected, actual, _) => {
                 write!(
                     f,
                     "Function '{}' returns type '{}' but got '{}'",
                     name, expected, actual
                 )
             }
-            AnalysisError::UnsupportedOperation(op, _) => {
+            UnsupportedOperation(op, _) => {
                 write!(f, "Unsupported operation '{}'", op)
             }
-            AnalysisError::WrongArity(expected, actual, name, _) => {
+            WrongArity(expected, actual, name, _) => {
                 write!(
                     f,
                     "Wrong arity for function '{}': expected {} arguments, found {}",
                     name, expected, actual
                 )
             }
-            AnalysisError::UncallableType(typ, _) => {
+            UncallableType(typ, _) => {
                 write!(f, "Uncallable type '{}'", typ)
             }
-            AnalysisError::Other(msg, _) => {
+            Unreachable(_) => {
+                write!(f, "Unreachable code")
+            }
+            FunctionNoReturnAllPaths(name, _) => {
+                write!(f, "Function '{}' may not return on all paths", name)
+            }
+
+            Other(msg, _) => {
                 write!(f, "{}", msg)
             }
         }
@@ -76,17 +89,20 @@ impl fmt::Display for AnalysisError {
 
 impl ReportableError for &AnalysisError {
     fn get_span(&self) -> &Span {
+        use AnalysisError::*;
         match self {
-            AnalysisError::UndefinedVariable(_, span) => span,
-            AnalysisError::UndefinedFunction(_, span) => span,
-            AnalysisError::TypeMismatch(_, _, span) => span,
-            AnalysisError::IncompatibleTypesBin(_, _, _, span) => span,
-            AnalysisError::IncompatibleTypesUn(_, _, span) => span,
-            AnalysisError::ReturnTypeMismatch(_, _, _, span) => span,
-            AnalysisError::UnsupportedOperation(_, span) => span,
-            AnalysisError::WrongArity(_, _, _, span) => span,
-            AnalysisError::UncallableType(_, span) => span,
-            AnalysisError::Other(_, span) => span,
+            UndefinedVariable(_, span)
+            | UndefinedFunction(_, span)
+            | TypeMismatch(_, _, span)
+            | IncompatibleTypesBin(_, _, _, span)
+            | IncompatibleTypesUn(_, _, span)
+            | ReturnTypeMismatch(_, _, _, span)
+            | UnsupportedOperation(_, span)
+            | WrongArity(_, _, _, span)
+            | UncallableType(_, span)
+            | Unreachable(span)
+            | FunctionNoReturnAllPaths(_, span)
+            | Other(_, span) => span,
         }
     }
 }

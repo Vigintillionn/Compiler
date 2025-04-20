@@ -1,4 +1,5 @@
 use crate::{
+    errors::analysis::AnalysisError,
     parser::ast::{Stmt, StmtKind, Type},
     program::TypeCheckedProgram,
 };
@@ -18,33 +19,37 @@ impl Default for FlowInfo {
     }
 }
 
-pub trait FlowCheck {
-    fn flow_check(&self) -> Result<FlowInfo, String>;
+pub trait FlowCheck<E> {
+    fn flow_check(&self) -> Result<FlowInfo, E>;
 }
 
-impl FlowCheck for TypeCheckedProgram {
-    fn flow_check(&self) -> Result<FlowInfo, String> {
+impl FlowCheck<Vec<AnalysisError>> for TypeCheckedProgram {
+    fn flow_check(&self) -> Result<FlowInfo, Vec<AnalysisError>> {
+        let mut errors = Vec::new();
         let mut info = FlowInfo::default();
 
         for stmt in &self.stmts {
             if !info.reachable {
-                return Err(format!("Unreachable code in program {:?}", stmt));
+                errors.push(AnalysisError::Unreachable(stmt.span));
+                continue;
             }
 
-            let next = stmt.flow_check()?;
-            if next.always_returns {
-                info = next;
-                break;
+            match stmt.flow_check() {
+                Ok(next) => info = next,
+                Err(e) => errors.push(e),
             }
-            info = next;
         }
 
-        Ok(info)
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(info)
+        }
     }
 }
 
-impl FlowCheck for Stmt {
-    fn flow_check(&self) -> Result<FlowInfo, String> {
+impl FlowCheck<AnalysisError> for Stmt {
+    fn flow_check(&self) -> Result<FlowInfo, AnalysisError> {
         use StmtKind::*;
         match &self.node {
             Block(stmts) => {
@@ -52,14 +57,9 @@ impl FlowCheck for Stmt {
 
                 for stmt in stmts {
                     if !info.reachable {
-                        return Err(format!("Unreachable code in program {:?}", stmt));
+                        return Err(AnalysisError::Unreachable(stmt.span));
                     }
-                    let next = stmt.flow_check()?;
-                    if next.always_returns {
-                        info = next;
-                        break;
-                    }
-                    info = next;
+                    info = stmt.flow_check()?;
                 }
                 Ok(info)
             }
@@ -86,7 +86,10 @@ impl FlowCheck for Stmt {
             Function(name, _, ret, body) => {
                 let body_info = body.flow_check()?;
                 if ret != &Type::Void && !body_info.always_returns {
-                    return Err(format!("Function `{}` may not return on all paths", name));
+                    return Err(AnalysisError::FunctionNoReturnAllPaths(
+                        name.clone(),
+                        self.span,
+                    ));
                 }
                 Ok(FlowInfo {
                     reachable: true,

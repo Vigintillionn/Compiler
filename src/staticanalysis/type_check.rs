@@ -2,6 +2,7 @@ use crate::{
     environment::Environment,
     errors::analysis::AnalysisError,
     parser::ast::{self, Expr, ExprKind, LiteralValue, Op, Stmt, StmtKind, Type, UnaryOp},
+    program::UncheckedProgram,
 };
 
 pub type TypeEnv = Environment<Type>;
@@ -11,15 +12,34 @@ pub struct Expected {
     ty: Type,
 }
 
-pub trait TypeCheck {
+pub trait TypeCheck<E> {
+    fn type_check(&self, env: &mut TypeEnv, expected: &Option<Expected>) -> Result<Type, E>;
+}
+
+impl TypeCheck<Vec<AnalysisError>> for UncheckedProgram {
     fn type_check(
         &self,
         env: &mut TypeEnv,
         expected: &Option<Expected>,
-    ) -> Result<Type, AnalysisError>;
+    ) -> Result<Type, Vec<AnalysisError>> {
+        let mut errors = Vec::new();
+
+        for stmt in &self.stmts {
+            match stmt.type_check(env, expected) {
+                Ok(_) => {}
+                Err(err) => errors.push(err),
+            }
+        }
+
+        if !errors.is_empty() {
+            Err(errors)
+        } else {
+            Ok(Type::Void)
+        }
+    }
 }
 
-impl TypeCheck for Expr {
+impl TypeCheck<AnalysisError> for Expr {
     fn type_check(&self, env: &mut TypeEnv, _: &Option<Expected>) -> Result<Type, AnalysisError> {
         use ExprKind::*;
         match &self.node.0 {
@@ -208,7 +228,7 @@ impl TypeCheck for Expr {
     }
 }
 
-impl TypeCheck for Stmt {
+impl TypeCheck<AnalysisError> for Stmt {
     fn type_check(
         &self,
         env: &mut TypeEnv,

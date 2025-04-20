@@ -12,29 +12,19 @@ mod type_check;
 pub fn type_check_program(
     program: UncheckedProgram,
 ) -> Result<TypeCheckedProgram, Vec<AnalysisError>> {
-    let mut errors = Vec::new();
-
     let mut env = TypeEnv::new();
     env.define(
         "print".to_string(),
         Type::Function(vec![Type::Any], Box::new(Type::Void), true),
     );
 
-    for stmt in &program.stmts {
-        match stmt.type_check(&mut env, &None) {
-            Ok(_) => {}
-            Err(err) => errors.push(err),
-        }
-    }
-
-    if !errors.is_empty() {
-        Err(errors)
-    } else {
-        Ok(program.into_type_checked())
-    }
+    program.type_check(&mut env, &None)?;
+    Ok(program.into_type_checked())
 }
 
-pub fn cf_check_program(program: TypeCheckedProgram) -> Result<CfCheckedProgram, String> {
+pub fn cf_check_program(
+    program: TypeCheckedProgram,
+) -> Result<CfCheckedProgram, Vec<AnalysisError>> {
     program.flow_check()?;
     Ok(program.into_cf_checked())
 }

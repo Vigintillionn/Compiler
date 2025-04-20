@@ -221,7 +221,8 @@ impl TypeCheck for Stmt {
                 for stmt in stmts {
                     stmt.type_check(env, expected)?;
                 }
-                env.exit_scope();
+                env.exit_scope()
+                    .map_err(|e| AnalysisError::Other(e, self.span))?;
                 Ok(Type::Void)
             }
             Var(name, expr, ty) => {
@@ -304,7 +305,8 @@ impl TypeCheck for Stmt {
                     incr.type_check(env, expected)?;
                 }
                 body.type_check(env, expected)?;
-                env.exit_scope();
+                env.exit_scope()
+                    .map_err(|e| AnalysisError::Other(e, self.span))?;
                 Ok(Type::Void)
             }
             Ret(expr) => {
@@ -345,7 +347,8 @@ impl TypeCheck for Stmt {
                         ty: ret_type.clone(),
                     }),
                 )?;
-                env.exit_scope();
+                env.exit_scope()
+                    .map_err(|e| AnalysisError::Other(e, self.span))?;
 
                 Ok(Type::Void)
             }

@@ -40,7 +40,7 @@ impl<T> Environment<T> {
             }
         }
 
-        Err(format!("Undefined variable: {}", name))
+        Err(format!("Undefined variable: '{}'", name))
     }
 }
 

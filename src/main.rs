@@ -1,7 +1,6 @@
-use errors::ReportableError;
 use interpreter::eval_program;
-pub use lexer::{tokenize, tokens::Token};
-pub use parser::parse;
+use lexer::{tokenize, tokens::Token};
+use parser::parse;
 use pipeline::{handle_errors, Pipeline};
 use sourcemap::SourceMap;
 use staticanalysis::{cf_check_program, type_check_program};

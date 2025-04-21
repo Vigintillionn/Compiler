@@ -78,7 +78,9 @@ impl fmt::Display for ParserError {
             ParserError::ExpectedIdentifier(token, _) => {
                 write!(f, "Expected identifier but got '{}'", token)
             }
-            _ => todo!(),
+            ParserError::Other(msg, _) => {
+                write!(f, "Parser error: {}", msg)
+            }
         }
     }
 }

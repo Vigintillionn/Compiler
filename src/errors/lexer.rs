@@ -35,7 +35,7 @@ impl fmt::Display for LexerError {
     }
 }
 
-impl ReportableError for &LexerError {
+impl ReportableError for LexerError {
     fn get_span(&self) -> &Span {
         match self {
             LexerError::InvalidCharacter(_, span) => span,

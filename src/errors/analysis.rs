@@ -87,7 +87,7 @@ impl fmt::Display for AnalysisError {
     }
 }
 
-impl ReportableError for &AnalysisError {
+impl ReportableError for AnalysisError {
     fn get_span(&self) -> &Span {
         use AnalysisError::*;
         match self {

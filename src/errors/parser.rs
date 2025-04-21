@@ -83,7 +83,7 @@ impl fmt::Display for ParserError {
     }
 }
 
-impl ReportableError for &ParserError {
+impl ReportableError for ParserError {
     fn get_span(&self) -> &Span {
         use ParserError::*;
         match self {

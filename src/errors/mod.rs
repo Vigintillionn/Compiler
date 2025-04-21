@@ -36,10 +36,27 @@ pub struct Spanned<T> {
     pub span: Span,
 }
 
-pub trait ReportableError: fmt::Display {
+pub trait ReportableError: fmt::Display + Sized {
     fn get_span(&self) -> &Span;
     fn len(&self) -> usize {
         self.get_span().len()
+    }
+    fn report(&self, sourcemap: &SourceMap) {
+        let (line_idx, col) = sourcemap.span_to_line_col(self.get_span().start);
+        let line_src = sourcemap.line_text(line_idx).unwrap_or_default();
+
+        eprintln!(
+            "\x1b[93mError\x1b[0m at line {}:{}: {}",
+            line_idx, col, self
+        );
+        eprintln!("     |");
+        eprintln!("{:4} | {}", line_idx, line_src.trim_end());
+        eprintln!(
+            "     | {:>width$}{}",
+            "",
+            "^".repeat(self.len()),
+            width = col - 1
+        );
     }
 }
 

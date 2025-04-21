@@ -30,7 +30,7 @@ fn main() -> Result<(), String> {
     ";
 
     let source_map = SourceMap::new(code);
-    let tokens: Vec<Token> = handle_errors(code, &source_map, tokenize)?;
+    let tokens = handle_errors(code, &source_map, tokenize)?;
 
     let ast = tokens
         .as_slice()

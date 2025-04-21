@@ -124,6 +124,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                         token:
                             Token {
                                 kind: Identifier(ref name),
+                                span,
                                 ..
                             },
                         ..
@@ -132,7 +133,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                         return Err(ParserError::InvalidExpression(
                             output
                                 .last()
-                                .map_or(token.clone().span, |expr| expr.span.clone()), // TODO: fix token.clone() part
+                                .map_or(token.span.clone(), |expr| expr.span.clone()),
                         ));
                     };
                     let args = output.split_off(
@@ -142,7 +143,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                     );
                     output.push(Expr {
                         node: ExprInner(ExprKind::Call(name.clone(), args), RefCell::new(None)),
-                        span: token.span, // TODO: is this the right span?
+                        span: Span::new(span.start, token.span.end),
                     });
                 }
             }

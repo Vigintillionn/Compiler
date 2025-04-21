@@ -11,8 +11,8 @@ mod interpreter;
 mod lexer;
 mod parser;
 mod pipeline;
-pub mod program;
-pub mod sourcemap;
+mod program;
+mod sourcemap;
 mod staticanalysis;
 
 fn main() -> Result<(), String> {

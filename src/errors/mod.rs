@@ -59,35 +59,3 @@ pub trait ReportableError: fmt::Display + Sized {
         );
     }
 }
-
-pub fn report_error<E: ReportableError>(err: E, sourcemap: &SourceMap) {
-    let (line_idx, col) = sourcemap.span_to_line_col(err.get_span().start);
-    let line_src = sourcemap.line_text(line_idx).unwrap_or_default();
-
-    eprintln!("\x1b[93mError\x1b[0m at line {}:{}: {}", line_idx, col, err);
-    eprintln!("     |");
-    eprintln!("{:4} | {}", line_idx, line_src.trim_end());
-    eprintln!(
-        "     | {:>width$}{}",
-        "",
-        "^".repeat(err.len()),
-        width = col - 1
-    );
-}
-
-pub enum CompilerError {
-    LexerError(lexer::LexerError),
-    ParserError(parser::ParserError),
-}
-
-impl Into<CompilerError> for lexer::LexerError {
-    fn into(self) -> CompilerError {
-        CompilerError::LexerError(self)
-    }
-}
-
-impl Into<CompilerError> for parser::ParserError {
-    fn into(self) -> CompilerError {
-        CompilerError::ParserError(self)
-    }
-}

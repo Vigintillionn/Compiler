@@ -1,4 +1,4 @@
-use errors::{report_error, ReportableError};
+use errors::ReportableError;
 use interpreter::eval_program;
 pub use lexer::{tokenize, tokens::Token};
 pub use parser::parse;

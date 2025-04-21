@@ -87,7 +87,7 @@ pub enum TokenKind {
     Or,         // ||
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Assoc {
     Left,
     Right,
@@ -139,23 +139,6 @@ impl TokenKind {
                 is_unary: true,
             }),
             _ => None,
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        use TokenKind::*;
-        match self {
-            Plus | Minus | Asterisk | Slash | Assign | Bang | Eq | LThan | GThan | Semi | Colon
-            | OpenParen | CloseParen | OpenBrace | CloseBrace | Comma | Ampersand => 1,
-            Arrow | And | Or | If | NotEq | LThanEq | GThanEq => 2,
-            For | Var | Ret | Int | Str => 3,
-            Loop | Else | Proc | Bool => 4,
-            While | Break | Float => 5,
-            Continue => 8,
-            Identifier(s) | StringLiteral(s) => s.len(),
-            IntLiteral(s) => s.to_string().len(),
-            FloatLiteral(s) => s.to_string().len(),
-            BoolLiteral(s) => s.to_string().len(),
         }
     }
 }

@@ -5,7 +5,7 @@ use crate::{
         parser::{ParserError, ParserResult},
         Span,
     },
-    lexer::tokens::TokenKind,
+    lexer::tokens::{Assoc, TokenKind},
     parser::ast::{
         disambiguate, BinaryOp, DisambiguatedOp, ExprInner, ExprKind, LiteralValue, Type,
     },
@@ -190,7 +190,9 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                         if let OpenParen | Identifier(_) = top_op.token.kind {
                             break;
                         }
-                        if top_op.prec >= disamb_op.prec {
+                        if top_op.prec > disamb_op.prec
+                            || (top_op.prec == disamb_op.prec && disamb_op.assoc == Assoc::Left)
+                        {
                             op_stack.pop();
                             handle_binary_operator(&top_op, &mut output).unwrap();
                         } else {

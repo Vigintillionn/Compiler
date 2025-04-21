@@ -17,9 +17,9 @@ use super::ast::{Expr, UnaryOp};
 pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
     use TokenKind::*;
     let mut tokens = tokens;
-    let mut op_stack: Vec<DisambiguatedOp> = Vec::new();
-    let mut output: Vec<Expr> = Vec::new();
-    let mut arg_stack: Vec<usize> = Vec::new();
+    let mut op_stack = Vec::new();
+    let mut output = Vec::new();
+    let mut arg_stack = Vec::new();
     let mut prev_token = None;
 
     let first_tok = tokens.first().ok_or(ParserError::Other(
@@ -172,6 +172,7 @@ pub fn parse_expr(tokens: &[Token]) -> ParserResult<(Expr, &[Token])> {
                     op_stack.push(disamb_op);
                 } else {
                     // Is an operator
+                    // Apply any pending unary operators
                     while let Some(top_op) = op_stack.last().cloned() {
                         if let OpenParen | Identifier(_) = top_op.token.kind {
                             break;

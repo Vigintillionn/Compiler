@@ -36,7 +36,7 @@ pub struct Spanned<T> {
     pub span: Span,
 }
 
-pub trait ReportableError: fmt::Display + Sized {
+pub trait ReportableError: fmt::Display {
     fn get_span(&self) -> &Span;
     fn len(&self) -> usize {
         self.get_span().len()

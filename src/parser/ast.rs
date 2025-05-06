@@ -93,7 +93,7 @@ pub struct BinaryOp(pub Box<Expr>, pub Op, pub Box<Expr>);
 #[derive(Debug, Clone)]
 pub struct UnaryOp(pub Op, pub Box<Expr>);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Op {
     Add,
     Sub,

@@ -1,7 +1,6 @@
 use crate::{
     errors::Spanned,
     parser::ast::{BinaryOp, ExprInner, ExprKind, LiteralValue, Op, Stmt, StmtKind, UnaryOp},
-    program::CfCheckedProgram,
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -343,12 +342,4 @@ impl ToTAC<TACOperand> for ExprInner {
             }
         }
     }
-}
-
-pub fn optimize_program(program: CfCheckedProgram) -> Result<TAC, String> {
-    let mut tac = TAC::new();
-    for stmt in &program.stmts {
-        stmt.to_tac(&mut tac)?;
-    }
-    Ok(tac)
 }

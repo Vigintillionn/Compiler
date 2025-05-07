@@ -62,7 +62,7 @@ pub enum TACOperand {
     Temp(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TACInstr {
     Label(String),
     Assign {

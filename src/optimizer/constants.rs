@@ -170,6 +170,20 @@ pub fn constant_fold_and_prop(tac: &mut TAC) {
                     };
                 }
             }
+            TACInstr::Call { dst, args, .. } => {
+                // Propagate constants into call arguments
+                for arg in args.iter_mut() {
+                    if let TACOperand::Temp(t) | TACOperand::Var(t) = arg {
+                        if let Some(val) = const_env.get(t) {
+                            *arg = val.clone();
+                        }
+                    }
+                }
+                // Calling a function invalidates any previous constant bound to dst
+                if let Some(d) = dst {
+                    const_env.remove(d);
+                }
+            }
             _ => {} // no-op
         }
     }

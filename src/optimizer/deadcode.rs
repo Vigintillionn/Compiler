@@ -38,21 +38,21 @@ pub fn dead_code_elimination(tac: &mut TAC) {
             // Control and side-effect instructions: always keep and add uses
             TACInstr::Label(_)
             | TACInstr::Goto(_)
-            | TACInstr::Store { ptr: _, src: _ }
-            | TACInstr::IfGoto { cond: _, label: _ }
-            | TACInstr::Call {
-                dst: _,
-                name: _,
-                args: _,
-            }
+            | TACInstr::Store { .. }
+            | TACInstr::Load { .. }
+            | TACInstr::IfGoto { .. }
+            | TACInstr::Call { .. }
             | TACInstr::Return(_) => {
                 // Keep and record uses
                 result.push(instr.clone());
                 match instr {
                     TACInstr::IfGoto { cond, .. } => cond.add_uses(&mut live),
-                    TACInstr::Store { ptr, src } => {
+                    TACInstr::Store { ptr, src, .. } => {
                         ptr.add_uses(&mut live);
                         src.add_uses(&mut live);
+                    }
+                    TACInstr::Load { dst, base, .. } => {
+                        base.add_uses(&mut live); // TODO: fix
                     }
                     TACInstr::Call { args, .. } => {
                         for arg in args {

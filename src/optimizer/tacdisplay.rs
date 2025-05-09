@@ -86,7 +86,8 @@ impl fmt::Display for TACInstr {
             TACInstr::Return(None) => write!(f, "return"),
             TACInstr::Return(Some(rv)) => write!(f, "return {}", rv),
 
-            TACInstr::Store { ptr, src } => write!(f, "*{} = {}", ptr, src),
+            TACInstr::Store { ptr, src, .. } => write!(f, "*{} = {}", ptr, src),
+            TACInstr::Load { dst, base, offset } => write!(f, "{} = *{} + {}", dst, base, offset),
         }
     }
 }

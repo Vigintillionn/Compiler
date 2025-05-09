@@ -1,6 +1,8 @@
+use std::{collections::HashMap, vec};
+
 use crate::{
     errors::Spanned,
-    parser::ast::{BinaryOp, ExprInner, ExprKind, LiteralValue, Op, Stmt, StmtKind, UnaryOp},
+    parser::ast::{BinaryOp, ExprInner, ExprKind, LiteralValue, Op, Stmt, StmtKind, Type, UnaryOp},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -72,6 +74,12 @@ pub enum TACInstr {
     Store {
         ptr: TACOperand,
         src: TACOperand,
+        offset: usize,
+    },
+    Load {
+        dst: String,
+        base: TACOperand,
+        offset: usize,
     },
     BinOp {
         op: TACOp,
@@ -203,7 +211,11 @@ impl ToTAC<()> for Stmt {
                     }
                     ExprKind::UnaryOp(UnaryOp(Op::Deref, boxed_ptr)) => {
                         let ptr = boxed_ptr.to_tac(tac)?;
-                        tac.instrs.push(TACInstr::Store { ptr, src: r });
+                        tac.instrs.push(TACInstr::Store {
+                            ptr,
+                            src: r,
+                            offset: 0,
+                        });
                         Ok(())
                     }
                     _ => {
@@ -251,7 +263,7 @@ impl ToTAC<()> for Stmt {
                 Ok(())
             }
             Function(name, params, _, body) => {
-                tac.instrs.push(TACInstr::Label(name.clone()));
+                tac.instrs.push(TACInstr::Label(format!("proc_{}", name)));
 
                 for (i, (param_name, _)) in params.iter().enumerate() {
                     let arg_temp = format!("arg{}", i);
@@ -328,18 +340,150 @@ impl ToTAC<TACOperand> for ExprInner {
                 Ok(TACOperand::Temp(dst))
             }
             ExprKind::Call(fname, args) => {
+                let ret_type = &self.1;
                 let mut arg_ops = Vec::new();
                 for arg in args {
                     arg_ops.push(arg.to_tac(tac)?);
                 }
-                let dst = tac.new_temp();
+
+                // If return type is void, we don't need a destination
+                let d = tac.new_temp();
+                let dst = if let Some(ret) = ret_type.clone().into_inner() {
+                    match ret {
+                        Type::Void => None,
+                        _ => Some(d.clone()),
+                    }
+                } else {
+                    None
+                };
+
                 tac.instrs.push(TACInstr::Call {
-                    dst: Some(dst.clone()),
+                    dst,
                     name: fname.clone(),
                     args: arg_ops,
                 });
-                Ok(TACOperand::Temp(dst))
+                Ok(TACOperand::Temp(d))
             }
+        }
+    }
+}
+
+pub trait UsesDefs {
+    fn uses(&self) -> Vec<String>;
+    fn defs(&self) -> Vec<String>;
+}
+
+impl UsesDefs for TACInstr {
+    fn uses(&self) -> Vec<String> {
+        match self {
+            TACInstr::Assign { src, .. } => src.vars(),
+            TACInstr::Store { ptr, src, .. } => vec![ptr.clone(), src.clone()]
+                .into_iter()
+                .flat_map(|op| op.vars())
+                .collect(),
+            TACInstr::Load { base, .. } => base.vars(),
+            TACInstr::BinOp { lhs, rhs, .. } => vec![lhs.clone(), rhs.clone()]
+                .into_iter()
+                .flat_map(|op| op.vars())
+                .collect(),
+            TACInstr::UnOp { expr, .. } => expr.vars(),
+            TACInstr::IfGoto { cond, .. } => cond.vars(),
+            TACInstr::Call { args, .. } => args.iter().flat_map(|arg| arg.vars()).collect(),
+            TACInstr::Return(Some(expr)) => expr.vars(),
+            _ => vec![],
+        }
+    }
+
+    fn defs(&self) -> Vec<String> {
+        match self {
+            TACInstr::Assign { dst, .. } => vec![dst.clone()],
+            TACInstr::Store { ptr, .. } => vec![ptr.clone()]
+                .into_iter()
+                .flat_map(|op| op.vars())
+                .collect(),
+            TACInstr::Load { dst, .. } => vec![dst.clone()],
+            TACInstr::BinOp { dst, .. } => vec![dst.clone()],
+            TACInstr::UnOp { dst, .. } => vec![dst.clone()],
+            TACInstr::Call { dst: Some(d), .. } => vec![d.clone()],
+            _ => vec![],
+        }
+    }
+}
+
+impl TACInstr {
+    fn rename_vars(&mut self, map: &HashMap<String, String>) {
+        match self {
+            TACInstr::Assign { dst, src } => {
+                *dst = map.get(dst).unwrap_or(dst).clone();
+                src.rename_vars(map);
+            }
+            TACInstr::BinOp { dst, lhs, rhs, .. } => {
+                *dst = map.get(dst).unwrap_or(dst).clone();
+                lhs.rename_vars(map);
+                rhs.rename_vars(map);
+            }
+            TACInstr::UnOp { dst, expr, .. } => {
+                *dst = map.get(dst).unwrap_or(dst).clone();
+                expr.rename_vars(map);
+            }
+            TACInstr::Store { ptr, src, .. } => {
+                ptr.rename_vars(map);
+                src.rename_vars(map);
+            }
+            TACInstr::IfGoto { cond, label } => {
+                cond.rename_vars(map);
+                *label = map.get(label).unwrap_or(label).clone();
+            }
+            TACInstr::Call { dst, name, args } => {
+                if let Some(d) = dst {
+                    *d = map.get(d).unwrap_or(d).clone();
+                }
+                *name = map.get(name).unwrap_or(name).clone();
+                for arg in args {
+                    arg.rename_vars(map);
+                }
+            }
+            TACInstr::Return(Some(expr)) => {
+                expr.rename_vars(map);
+            }
+            _ => {}
+        }
+    }
+}
+
+impl TACOperand {
+    fn vars(&self) -> Vec<String> {
+        match self {
+            TACOperand::Var(name) | TACOperand::Temp(name) => vec![name.clone()],
+            _ => vec![],
+        }
+    }
+
+    fn rename_vars(&mut self, map: &HashMap<String, String>) {
+        if let TACOperand::Var(v) = self {
+            *v = map.get(v).unwrap_or(v).clone();
+        }
+        if let TACOperand::Temp(v) = self {
+            *v = map.get(v).unwrap_or(v).clone();
+        }
+    }
+}
+
+impl TAC {
+    pub fn uniquify_variables(&mut self) {
+        let mut counters = HashMap::new();
+        let mut mapping = HashMap::new();
+
+        for instr in &mut self.instrs {
+            for var in instr.defs().into_iter().chain(instr.uses()) {
+                if !mapping.contains_key(&var) {
+                    let cnt = counters.entry(var.clone()).or_insert(0);
+                    let new_name = format!("{}_{}", var.clone(), cnt);
+                    *cnt += 1;
+                    mapping.insert(var, new_name.clone());
+                }
+            }
+            instr.rename_vars(&mapping);
         }
     }
 }
